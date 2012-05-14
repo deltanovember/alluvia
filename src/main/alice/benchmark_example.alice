@@ -1,0 +1,46 @@
+
+
+userparams
+
+	SECURITY_ : "The security of interest" : ^GAS;
+	BENCHMARK_PERIOD : "Length of benchmark interval" : 5 days;
+
+end userparams
+
+
+#include "config.alice"
+
+declare trading_activity[security] : value
+declare trading_activity_mean[security] : number
+
+on trade
+	trading_activity[security] += value
+end on
+
+at dayend
+	per security
+		if security = SECURITY_ then
+			print "Current day: [trading_activity[security]] Benchmark period: [trading_activity_mean[security]]"
+		end if
+	end per
+end at
+
+
+#------------- BENCHMARK SECTION --------------
+
+benchmarks_below : BENCHMARK_PERIOD
+
+at start
+	declare trading_activity_dist[security] : distribution
+end at
+
+on trade
+	trading_activity_dist[security] <- value
+end on
+
+at end
+	per security
+		trading_activity_mean[security] = distaverage(trading_activity_dist[security])
+	end per
+end at
+

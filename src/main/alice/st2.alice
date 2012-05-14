@@ -1,0 +1,8 @@
+
+
+on mkttrade
+	if security =  ^VOD.L then
+		print "[time] [price]"
+	end if
+end on
+

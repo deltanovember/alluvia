@@ -1,0 +1,162 @@
+/**************************************************************************************************************************************************************************************************************
+
+Full Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	Pairs
+ 
+Type:		Data extraction
+
+Description:	
+
+Input(s):	None
+
+Output(s): 	
+		
+Author: 	
+
+Date:  	24 May 2011
+
+Version: 	1.0
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#define yesterday trday(date,-1)
+
+userparams
+	
+	MKT : "Name of stock market" : "ASX";
+	OPEN_TIME_1 : "Start of continuous trading period 1" : 10:10:00;
+	CLOSE_TIME_1 : "End of continuous trading period 1" : 16:00:00;
+	OPEN_TIME_2 : "Start of continuous trading period 2" : 00:00:00; 	// There is only one continuous trading period on ASX, use for markets like HKX
+	CLOSE_TIME_2 : "End of continuous trading period 2" : 00:00:00;
+ 	SCALE : "Used to scale value amounts to dollars rather than cents" : 1;
+	PRINT_DAILY : "Print data to daily or monthly files" : false;
+	PRINT_HEADER : "Print first row of CSV with headers" : true;
+
+end userparams
+
+at start
+	
+	declare filename : string
+
+	declare last_mpprice[security] : price
+	declare erroneous_data[security] : zeroed boolean
+
+	// The names of any securities
+	declare security_list[security] : boolean
+	security_list[^BHP.AX] = true
+	security_list[^RIO.AX] = true
+	security_list[^NAB.AX] = true
+	security_list[^CBA.AX] = true
+
+	// The names of any market indices
+	declare index_name[string,number] : string
+	index_name["LSE",1] = "FTSE"
+	index_name["LSE",2] = "FTLC"
+	index_name["LSE",3] = "FTMC"
+	index_name["OSE",1] = "OBX"
+	index_name["HKX",1] = "HSI"
+	index_name["ASX",1] = "AORD"
+
+end at
+
+// =======================================================================================================================================
+// 	FUNCTIONS
+// =======================================================================================================================================
+
+// Date string
+function dateStr(date_ : date) : string
+	
+	declare let d = day(date_)
+	if d < 10 then declare let dd = "0[d]" else declare let dd = "[d]" end if
+	
+	declare let m = month(date_)
+	if m < 10 then declare let mm = "0[m]"	else declare let mm = "[m]" end if
+	
+	declare let yyyy = year(date_)
+	
+	return "[yyyy][mm][dd]"
+	
+end dateStr
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at daystart
+
+	if (PRINT_DAILY and istrading(date)) or (not(PRINT_DAILY) and (undefined filename or month(date) != month(yesterday))) then
+
+		declare let date_str = dateStr(date)
+		if not(PRINT_DAILY) then
+			date_str = substr(date_str,1,6)
+		end if
+
+		// Print output file headings
+		filename = "Pairs [MKT] [date_str].csv"
+
+		if (PRINT_HEADER) then
+			
+			printcsv filename, 
+				"date", 
+				"event_time", 
+				"security" ,
+				"market",
+				"mid"
+				
+		end if
+			
+	end if
+	
+end at
+
+// =======================================================================================================================================
+// 	DATA
+// =======================================================================================================================================
+
+// Erroneous data check
+on mkttrade
+	if price >= 50 * closeprice(date) or price <= closeprice(date) / 50 then
+		erroneous_data[security] = true
+	end if	
+end on
+
+// Print data
+after quote
+	if (time >= OPEN_TIME_1 and time <= CLOSE_TIME_1) or (time >= OPEN_TIME_2 and time <= CLOSE_TIME_2) then
+
+		if not(erroneous_data[security]) and bid < ask then
+
+			if defined security_list[security] and (undefined last_mpprice[security] or mpprice != last_mpprice[security]) then
+		
+				// Print to screen
+				//print "[transid] [transtype] [date] [time] [security] [bid] [ask] [quotevolbid] [quotevolask] [price] [volume]"
+				
+				// Print to file
+				printcsv filename, 	
+						date, 
+						time, 
+						security,
+						MKT, 
+						number(mpprice)
+				
+				// Last prices
+				last_mpprice[security] = mpprice
+						
+			end if
+					
+		end if
+
+	end if
+end after
+
+// Clear data
+at dayend
+	free last_mpprice[]
+	free erroneous_data[]
+end at
+

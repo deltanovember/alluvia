@@ -1,0 +1,273 @@
+/**************************************************************************************************************************************************************************************************************
+
+Basic Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	Basic Extractor
+ 
+Type:		Data extraction
+
+Description:	Extracts end of day data and data at intraday intervals
+
+Input(s):	config.alice
+
+Output(s): 	csv file
+		
+Authors: 	Matthew Clifton, Don Nguyen
+
+Date:  	18 October 2011
+
+Version: 	1.0
+
+History: 	...
+		18/10/2011 v1.0 : 	Created
+
+*************************************************************************************************************************************************************************************************************/
+
+#include "config.alice"
+#define ACTIVE_STOCK (tcount(date,date) >= 1)
+
+// =======================================================================================================================================
+// 	USER PARAMS
+// =======================================================================================================================================
+
+userparams
+
+	PRINT_HEADER : "Print first row of CSV with headers" : true;
+	MAX_VOLUME : "Filter out bad data" : x100000000;
+	TIME_LAG : "Reuters data time lag" : 0.5 seconds;
+	INTERVAL : "Intraday time interval" : 15 minutes;
+	EOD : "Extract end of day" : true;
+	INTRADAY : "Extract intraday data" : false;
+
+end userparams
+
+
+// Print to file
+function print2csv_eod(filename : string, date_ : string, security_ : string, category : string, open_ : number, close_ : number, high_ : number, low_ : number, volume_ : volume, value_ : value, tcount_ : number)
+	
+	//if security = ^ESG.AX or security = ^KZL.AX then
+		
+		printcsv filename, 
+				date_, 
+				security_, 
+				category, 
+				open_ / scale_price[mkt[marketcode]], 
+				close_ / scale_price[mkt[marketcode]], 
+				high_ / scale_price[mkt[marketcode]], 
+				low_ / scale_price[mkt[marketcode]], 
+				volume_, 
+				number(value_) / scale_value[mkt[marketcode]], 
+				tcount_
+
+	//end if
+
+end print2csv_eod
+function print2csv_intraday(filename : string, date_ : string, time_ : time, security_ : security, category : string, open_ : number, close_ : number, high_ : number, low_ : number, volume_ : volume, value_ : value, tcount_ : number)
+	
+	//if security = ^ESG.AX or security = ^KZL.AX then
+		
+		printcsv filename, 
+				date_, 
+				security_, 
+				category, 
+				open_ / scale_price[mkt[marketcode]], 
+				close_ / scale_price[mkt[marketcode]], 
+				high_ / scale_price[mkt[marketcode]], 
+				low_ / scale_price[mkt[marketcode]], 
+				volume_, 
+				number(value_) / scale_value[mkt[marketcode]], 
+				tcount_
+
+	//end if
+
+end print2csv_intraday
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	declare last_month : number
+	declare first_price[security] : price
+	declare last_price[security] : price
+	declare max_price[security] : price
+	declare min_price[security] : price
+	declare trade_volume[security] : zeroed volume
+	declare trade_value[security] : zeroed value
+	declare trade_count[security] : zeroed number
+end at
+
+at daystart
+
+	// Get today's date
+	declare let dateString = dateStr(date)
+	
+	// at month start
+	if undefined last_month or last_month != month(date) then
+		
+		last_month = month(date)
+
+		// Output file headings
+		if EOD then
+			declare let filename_eod = "end_of_day_[mkt[marketcode]]_[dateStrFile()].csv"
+			if PRINT_HEADER then
+				printcsv filename_eod, 
+					"date", 
+					"security",
+					"category", 
+					"open", 
+					"close", 
+					"high", 
+					"low",
+					"volume", 
+					"value", 
+					"tcount"
+			end if
+		end if
+				
+		if INTRADAY then
+			declare let filename_intraday = "intraday_[mkt[marketcode]]_[dateStrFile()].csv"
+			if PRINT_HEADER then
+				printcsv filename_intraday, 
+					"date", 
+					"time", 
+					"security",
+					"category",
+					"open", 
+					"close", 
+					"high", 
+					"low",
+					"volume", 
+					"value", 
+					"tcount"
+			end if	
+		end if
+
+	end if
+
+end at
+
+
+// =======================================================================================================================================
+// 	INTRADAY DATA
+// =======================================================================================================================================
+
+//on quote, mkttrade
+//	if INTRADAY and CONTINUOUS_TRADING then
+//		if undefined first_price[security] then
+//			first_price[security] = price
+//		end if
+//		last_price[security] = trueprice
+//		if undefined max_price[security] or price > max_price[security] then
+//			 max_price[security] = price
+//		end if
+//		if undefined min_price[security] or price < min_price[security] then
+//			 min_price[security] = price
+//		end if
+//	end if
+//end on
+
+//on index
+//	if INTRADAY and CONTINUOUS_TRADING then
+//		if undefined first_price[index] then
+//			first_price[index] = price(indexval)
+//		end if
+//		last_price[index] = price(indexval)
+//		if undefined max_price[index] or price > max_price[index] then
+//			 max_price[index] = price(indexval)
+//		end if
+//		if undefined min_price[index] or price < min_price[index] then
+//			 min_price[index] = price(indexval)
+//		end if
+//	end if
+//end on
+//
+//on mkttrade
+//	if INTRADAY and CONTINUOUS_TRADING then
+//		trade_volume[security] += volume
+//		trade_value[security] += value
+//		trade_count[security] += 1
+//	end if
+//end on
+//	
+//every INTERVAL
+//	if INTRADAY and CONTINUOUS_TRADING then
+//		per security
+//			if ACTIVE_STOCK then
+//				print2csv_intraday(filename_intraday, 
+//					dateString, 
+//					time, 
+//					security, 
+//					"E", 
+//					number(first_price[security]), 
+//					number(last_price[security]), 
+//					number(max_price[security]), 
+//					number(min_price[security]), 
+//					trade_volume[security], 
+//					trade_value[security], 
+//					trade_count[security])
+//					
+//				first_price[security] = last_price[security]
+//				max_price[security] = dummyprice
+//				min_price[security] = dummyprice
+//				trade_volume[security] = x0
+//				trade_value[security] = $0
+//				trade_count[security] = 0
+//			end if
+//		end per
+////		per index
+////			print2csv_intraday(filename_interval, 
+////					dateString, 
+////					time, 
+////					index, 
+////					"I", 
+////					first_price[index], 
+////					last_price[index], 
+////					max_price[index], 
+////					min_price[index], 
+////					"", 
+////					"", 
+////					"")
+////					
+////			first_price[index] = last_price[index]
+////			max_price[index] = dummyprice
+////			low_price[index] = dummyprice
+////		end per
+//	end if
+//end every
+
+at dayend
+	if EOD and istrading(date) then
+		per security
+			if ACTIVE_STOCK then
+				print2csv_eod(filename_eod, 
+					dateString, 
+					"[security]", 
+					"E", 
+					number(openprice(date)), 
+					number(closeprice(date)), 
+					number(maxprice(date)), 
+					number(minprice(date)), 
+					volume(date,date), 
+					value(date,date), 
+					tcount(date,date))
+			end if
+		end per
+		per index
+			print2csv_eod(filename_eod, 
+				dateString, 
+				"[index]", 
+				"I", 
+				indexvalOpen(index,date),  
+				indexvalClose(index,date),  
+				indexvalMax(index,date),  
+				indexvalMin(index,date),  
+				x0, 
+				$0, 
+				0)
+		end per
+	end if
+end at
+

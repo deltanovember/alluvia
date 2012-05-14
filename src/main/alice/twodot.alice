@@ -1,0 +1,27 @@
+
+
+function formatSecurity() : string
+	
+	declare let sec_ = "[security]"
+	declare let sec_length = strlen(sec_)
+	sec_ = substr(sec_,1,sec_length)
+
+	if substr(sec_,3,3)=="." then
+		sec_ = "[substr(sec_,1,2)].[substr(sec_,3,sec_length)]"
+	end if
+		
+	return sec_
+	
+end formatSecurity
+
+
+at start
+	per security
+		print "[security] [formatSecurity()]"
+	end per
+end at
+
+	
+
+
+

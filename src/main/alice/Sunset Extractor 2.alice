@@ -1,0 +1,241 @@
+/**************************************************************************************************************************************************************************************************************
+
+Sunset Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	Sunset Extractor.alice
+ 
+Type:		Data extraction
+
+Description:	This script extracts key data fields for the purpose of identifying abnormal end-of-day price movements.
+
+Input(s):	None
+
+Output(s): 	This program extracts data to files in the form 'sunset [MKT] (YYYY.MM).csv' where MKT is the exchange 
+		identifier and the date is the year followed by each month of the run.
+
+Author: 	Matthew Clifton (clifton.matthew@gmail.com)
+
+Date:  	16 August 2011
+
+Version: 	1.1
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#include "config.alice"
+
+#define P1 15 minutes
+#define P2 60 minutes
+#define P3 120 minutes
+
+userparams
+
+	MIN_LIQ : "Minimum number of daily trades yesterday" : 20; // Mainly to cut down on number of rows
+	MIN_DAY_VAL : "Minimum value traded yesterday" : $40000; // Mainly to cut down on number of rows
+	MIN_AUC_VAL : "Minimum value traded closing auction yesterday" : $10000; // Mainly to cut down on number of rows
+	MAX_WEEKLY_CHANGE : "Maximum weekly price change (%)" : 20; // Only suitable for sunset algorithm !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	MAX_DAILY_CHANGE : "Maximum daily price change (%)" : 10; // Only suitable for sunset algorithm !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	ESCAPE_VALUE_1 : "Size of position to exit as percentage of yesterday'closing auction" : 20%;
+	ESCAPE_VALUE_2 : "Size of position to exit as percentage of yesterday'closing auction" : 50%;
+
+end userparams
+
+at start
+	
+	MIN_DAY_VAL = MIN_DAY_VAL / scale[marketcode]
+	MIN_AUC_VAL = MIN_AUC_VAL / scale[marketcode]
+
+end at
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	
+	// Declare arrays
+	declare filename : string
+	
+	declare last_time[date,security] : time
+	declare last_ask_price[date,security] : price
+	declare last_bid_price[date,security] : price
+	declare last_true_price[date,security] : price
+	
+	declare close_auction_value[date,security] : value
+	declare extended[date,security] : zeroed number
+	
+	declare weekly_hi_dist : distribution
+	declare weekly_lo_dist : distribution
+	
+	declare index_open[date,number] : number
+	declare index_day_change[number] : number
+	declare index_night_change[number] : number
+
+end at
+
+at daystart
+	
+	// If new month
+	if (undefined filename or month(date) != month(yesterday)) and date != alertdate then
+	
+		// Print output file headings
+		filename = "sunset [mkt[marketcode]] [dateStr(date)].csv"
+		
+		printcsv filename, 
+			"date", 
+			"security", 
+			"market", 
+			"tcount", 
+			"value", 
+			"weekly_range", 
+			"last_ask", 
+			"last_bid", 
+			"last_trueprice", 
+			"close_price", 
+			"close_value", 
+			"auction_extended", 
+			"stock_day_change", 
+			"index_day_change_1", 
+			"index_day_change_2", 
+			"index_day_change_3", 
+			"open_price", 
+			"open_vwap_1]", 
+			"open_vwap_2]", 
+			"open_vwap_3]", 
+			"exit_price", 
+			"stock_night_change", 
+			"index_night_change_1", 
+			"index_night_change_2", 
+			"index_night_change_3"
+
+	end if
+		
+end at
+
+
+// Get end of continuous trading stats
+// ----------------------------------------------------------------------------------------------------------------------------------------
+on quote
+	if tcount(yesterday,yesterday) >= MIN_LIQ and value(yesterday,yesterday) >= MIN_DAY_VAL then
+		if time < continuous_end[marketcode] - 1 seconds then
+			last_ask_price[date,security] = ask
+			last_bid_price[date,security] = bid
+			last_true_price[date,security] = trueprice
+		end if
+	end if
+end on
+
+// Get closing auction stats
+// ----------------------------------------------------------------------------------------------------------------------------------------
+on mkttrade
+	if tcount(yesterday,yesterday) >= MIN_LIQ and value(yesterday,yesterday) >= MIN_DAY_VAL then
+		if time >= close_auction_end[marketcode] and time <= close_auction_end[marketcode] + 20 minutes then // flags(+UT) would be more accurate if you have it.
+			close_auction_value[date,security] += value
+		end if
+		if marketcode = "lse_mq" and time > close_auction_end[marketcode] + 30 seconds then // LSE Price Monitoring Extension
+			extended[date,security] = 1
+		else
+			extended[date,security] = 0
+		end if
+		
+	end if
+end on
+
+// Get index open value
+at dayend
+	for declare let i = 1 ; i <= n ; i += 1 do
+		index_open[date,i] = indexval(index(index_name[marketcode,i]),open_auction_end["lse_mq"] + 30 seconds)
+		print index_open[date,i]
+	end for
+end at
+
+
+// End of day stuff
+// ----------------------------------------------------------------------------------------------------------------------------------------
+at dayend
+	if istrading(date) and date != alertdate then	
+		
+		// Print stock data
+		per security
+
+			if tcount(yesterday,yesterday) >= MIN_LIQ 
+				and value(yesterday,yesterday) >= MIN_DAY_VAL 
+				and close_auction_value[yesterday,security] >= MIN_AUC_VAL then
+
+				declare let stock_day_change = 100 * log(closeprice(yesterday)/openprice(yesterday))
+				declare let stock_night_change = 100 * log(trueprice(exit_time[marketcode])/closeprice(yesterday))
+				
+				for declare let i = 1 ; i <= n ; i += 1 do
+					index_day_change[i] = 0
+					index_night_change[i] = 0
+					if defined index(index(index_name[marketcode,i])) then
+						index_day_change[i] = 100 * log(indexvalClose(index(index_name[marketcode,i]),yesterday)/index_open[yesterday,i])
+						index_night_change[i] = 100 * log(indexval(index(index_name[marketcode,i]),exit_time[marketcode])/indexvalClose(index(index_name[marketcode,i]),yesterday))
+					end if
+				end for
+
+				// Weekly range
+				free weekly_hi_dist[]
+				weekly_hi_dist <- maxprice(yesterday)
+				weekly_hi_dist <- maxprice(trday(yesterday,-1))
+				weekly_hi_dist <- maxprice(trday(yesterday,-2))
+				weekly_hi_dist <- maxprice(trday(yesterday,-3))
+				weekly_hi_dist <- maxprice(trday(yesterday,-4))
+				declare let weekly_hi = distmax(weekly_hi_dist)
+				free weekly_lo_dist[]
+				weekly_lo_dist <- minprice(yesterday)
+				weekly_lo_dist <- minprice(trday(yesterday,-1))
+				weekly_lo_dist <- minprice(trday(yesterday,-2))
+				weekly_lo_dist <- minprice(trday(yesterday,-3))
+				weekly_lo_dist <- minprice(trday(yesterday,-4))
+				declare let weekly_lo = distmin(weekly_lo_dist)
+				declare let weekly_range = 100* (weekly_hi - weekly_lo) / ((weekly_hi + weekly_lo)/2)
+
+				// Print details
+		 		printcsv filename, 
+					yesterday, 
+					security, 
+					mkt[marketcode], 
+					tcount(yesterday,yesterday), 
+					number(value(yesterday,yesterday) / scale[marketcode]), 
+					weekly_range, 
+					number(last_ask_price[yesterday,security]), 
+					number(last_bid_price[yesterday,security]), 
+					number(last_true_price[yesterday,security]), 
+					number(closeprice(yesterday)), 
+					number(close_auction_value[yesterday,security] / scale[marketcode]), 
+					extended[yesterday,security], 		
+					stock_day_change, 
+					index_day_change[1], 
+					index_day_change[2], 
+					index_day_change[3], 
+					number(openprice(date)), 
+					format(vwap(open_auction_end["lse_mq"]+P1),5,3), 
+					format(vwap(open_auction_end["lse_mq"]+P2),5,3), 
+					format(vwap(open_auction_end["lse_mq"]+P3),5,3), 
+					format(trueprice(exit_time[marketcode]),5,3), 
+					stock_night_change, 
+					index_night_change[1], 
+					index_night_change[2], 
+					index_night_change[3]
+				
+			end if
+			
+			last_ask_price[yesterday,security] = dummyprice
+			last_bid_price[yesterday,security] = dummyprice
+			last_true_price[yesterday,security] = dummyprice
+			close_auction_value[yesterday,security] = dummyvalue
+			extended[yesterday,security] = dummynumber
+
+		end per
+
+	end if
+
+	for declare let i = 1 ; i <= n ; i += 1 do
+		index_open[trday(yesterday,-1),n] = dummynumber
+	end for
+
+end at

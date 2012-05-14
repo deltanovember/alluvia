@@ -1,0 +1,317 @@
+/**************************************************************************************************************************************************************************************************************
+
+iRev Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	iRev Extractor.alice
+ 
+Type:		Data extraction
+
+Description:	This script extracts key data fields for the purpose of identifying abnormal intraday price movements.
+
+Input(s):	None
+
+Output(s): 	This program extracts data to files in the form 'iRev [MKT] YYYYDD.csv' where MKT is the exchange 
+		identifier and the YYYYMMis the year followed by each month of the run.
+		
+Author: 	Matthew Clifton (matthew.clifton@alluvialtrading.com)
+
+Date:  	20 May 2011
+
+Version: 	2.0
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#include "config.alice"
+
+userparams
+	
+	INTERVAL : "Time between events (if in time mode)" : 5 minutes;
+	N_EVENTS : "Number of of events after liquidity shock" : 10;
+
+end userparams
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	
+	// Declare arrays
+	declare id[security] : number
+
+	declare last_bid[security] : price
+	declare last_ask[security] : price
+	declare last_bidvol[security] : volume
+	declare last_askvol[security] : volume
+
+	declare bid_before[security,number] : price
+	declare ask_before[security,number] : price
+	declare bidvol_before[security,number] : volume
+	declare askvol_before[security,number] : volume
+	
+	declare bid_after[security,number] : price
+	declare ask_after[security,number] : price
+	declare bidvol_after[security,number] : volume
+	declare askvol_after[security,number] : volume
+					
+	declare trade_time[security,number] : time
+	declare trade_price_volume[security,number] : value
+	declare trade_volume[security,number] : volume
+			
+	declare last_trade_time[security] : time
+	declare liquidity_shock[security,number] : boolean
+	
+	declare blim_count[security,number] : number
+	declare time_n[security,number,number] : time
+	declare bid_n[security,number,number] : price
+	declare ask_n[security,number,number] : price
+	declare bidvol_n[security,number,number] : volume
+	declare askvol_n[security,number,number] : volume
+	
+	declare erroneous_data[security] : zeroed boolean
+
+	// Print output file headings
+	declare let filename = "iRev [mkt[marketcode]] [dateStrFile()] TQ.csv"
+	
+	declare let headers = ""
+	for declare let i = 1 ; i <= N_EVENTS ; i += 1 do
+		headers = "[headers];time[i];bid[i];ask[i];bidvol[i];askvol[i]"
+	end for
+	
+	printcsv filename, 
+		"date", 
+		"security", 
+		"p_tcount", 
+		"event_id", 
+		"time", 
+		"bid_before", 
+		"ask_before", 
+		"bidvol_before", 
+		"askvol_before", 
+		"trade_vwap", 
+		"trade_volume", 
+		"bid_after", 
+		"ask_after", 
+		"bidvol_after", 
+		"askvol_after[headers]"
+		
+end at
+
+at daystart
+	per security
+		 id[security] = -1
+	end per
+end at
+
+// On trade
+on mkttrade
+
+	// Check for erroneous data
+	if price >= 50 * closeprice(date) or price <= closeprice(date) / 50 then
+		erroneous_data[security] = true
+	else
+		
+		// Unique trade event (consolidate trades with the same timestamp)
+		if undefined trade_time[security,id[security]] or time!= last_trade_time[security] then
+			id[security] += 1
+		end if
+	
+		bid_before[security,id[security]] = last_bid[security]
+		ask_before[security,id[security]] = last_ask[security]
+		bidvol_before[security,id[security]] = last_bidvol[security]
+		askvol_before[security,id[security]] = last_askvol[security]
+		
+		trade_time[security,id[security]] = time
+		trade_price_volume[security,id[security]] += price * volume
+		trade_volume[security,id[security]] += volume
+		
+		last_trade_time[security] = time
+
+		if security = ^BLD.AX then
+		print "TRADE [date] [time] [security] Bid: [bid] Ask: [ask]"
+		end if
+		if (defined bid and defined ask) and (bid < last_bid[security] or ask > last_ask[security]) then
+			liquidity_shock[security,id[security]] = true
+		else
+			liquidity_shock[security,id[security]] = false
+		end if
+		
+		blim_count[security,id[security]] = 0
+
+	end if
+	
+end on
+
+// Quote volume after trade
+// With only trade and quote data there is no function to get the resulting bid or ask or quote volume after a trade
+// The next incoming quote provides the first observation of quote volume following a trade
+on quote
+	bid_after[security,id[security]] = bid
+	ask_after[security,id[security]] = ask
+	bidvol_after[security,id[security]] = quotevolbid
+	askvol_after[security,id[security]] = quotevolask
+end on
+
+// BLim update
+on quote
+	
+	if security = ^BLD.AX then
+	print "QUOTE [date] [time] [security] Bid: [bid] Ask: [ask]"
+	end if
+	
+	if (bid != last_bid[security] or ask != last_ask[security] or quotevolbid != last_bidvol[security] or quotevolask != last_askvol[security]) and bid != ask then
+		
+		for declare let k = 1 ; k <= id[security] ; k += 1 do
+			
+			if liquidity_shock[security,k] and blim_count[security,k] <= N_EVENTS then
+				
+				if defined bid and defined ask and defined quotevolbid and defined quotevolask then
+					
+					blim_count[security,k] += 1
+					time_n[security,k,blim_count[security,k]] = time
+					bid_n[security,k,blim_count[security,k]] = bid
+					ask_n[security,k,blim_count[security,k]] = ask
+					bidvol_n[security,k,blim_count[security,k]] = quotevolbid
+					askvol_n[security,k,blim_count[security,k]] = quotevolask
+					
+				end if
+					
+			end if	
+		end for
+				
+	end if
+	
+	// Last quote data
+	last_bid[security] = bid
+	last_ask[security] = ask
+	last_bidvol[security] = quotevolbid
+	last_askvol[security] = quotevolask
+	
+end on
+
+// At dayend
+at dayend
+	
+	if istrading(date) then
+	
+		per security
+
+			if not(erroneous_data[security]) then
+		
+				for declare let i = 1 ; i <= id[security] - 1 ; i += 1 do
+
+					if liquidity_shock[security,i] and blim_count[security,i] = N_EVENTS and defined bidvol_after[security,i] and defined askvol_after[security,i] then
+
+						declare let trade_vwap = trade_price_volume[security,i] / trade_volume[security,i]
+	
+						declare let data = ""
+						for declare let n = 1 ; n <= N_EVENTS ; n += 1 do
+							data = "[data];[time_n[security,i,n]];[number(bid_n[security,i,n])];[number(ask_n[security,i,n])];[number(bidvol_n[security,i,n])];[number(askvol_n[security,i,n])]"
+						end for
+	
+						printcsv filename, 	
+							date, 
+							security, 
+							tcount(yesterday), 
+							i, 		
+							trade_time[security,i], 
+							number(bid_before[security,i]), 
+							number(ask_before[security,i]), 
+							bidvol_before[security,i], 
+							askvol_before[security,i], 
+							number(trade_vwap), 
+							trade_volume[security,i], 
+							number(bid_after[security,i]), 
+							number(ask_after[security,i]), 
+							bidvol_after[security,i], 
+							"[number(askvol_after[security,i])][data]"
+							
+					end if
+
+				end for
+		
+			end if
+		
+		end per
+	
+	free id[]
+
+	free last_bid[]
+	free last_ask[]
+	free last_bidvol[]
+	free last_askvol[]
+
+	free bid_before[]
+	free ask_before[]
+	free bidvol_before[]
+	free askvol_before[]
+	
+	free bid_after[]
+	free ask_after[]
+	free bidvol_after[]
+	free askvol_after[]
+					
+	free trade_time[]
+	free trade_price_volume[]
+	free trade_volume[]
+			
+	free last_trade_time[]
+	free liquidity_shock[]
+	
+	free blim_count[]
+	free time_n[]
+	free bid_n[]
+	free ask_n[]
+	free bidvol_n[]
+	free askvol_n[]
+	
+	free erroneous_data[]
+	
+	end if
+	
+end at
+
+////before mkttrade
+////	with ^BLD.AX
+////		print "BEFORE MKTTRADE [time] [bid] [bidbefore] [bidafter]"
+////	end with
+////end before
+////	
+//on mkttrade
+//	if time > 10:13:00 and time < 10:15:00 then
+//	if security = ^BLD.AX then
+//		print "ON MKTTRADE [date] [time] [security] [price] [volume] [bid] [ask]"
+//	end if
+//	end if
+//end on
+//
+////after mkttrade
+////	with ^BLD.AX
+////		print "AFTER MKTTRADE [time] [bid] [bidbefore] [bidafter]"
+////	end with
+////end after
+////
+////before quote
+////	with ^BLD.AX
+////		print "BEFORE QUOTE [time] [bid] [bidbefore] [bidafter]"
+////	end with
+////end before
+////	
+//on quote
+//	if time > 10:13:00 and time < 10:15:00 then
+//	if security = ^BLD.AX then
+//		print "ON QUOTE [date] [time] [security] [bid] [ask] [quotevolbid] [quotevolask]"
+//	end if
+//	end if
+//end on
+////
+////after quote
+////	with ^BLD.AX
+////		print "AFTER QUOTE [time] [bid] [bidbefore] [bidafter]"
+////	end with
+////end after
+

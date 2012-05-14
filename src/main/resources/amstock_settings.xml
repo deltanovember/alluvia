@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Only the settings with values not equal to defaults are in this file. If you want to see the
+full list of available settings, check the amstock_settings.xml file in the amstock folder. -->
+<settings>
+  <margins>0</margins>                                                   
+  <redraw>true</redraw>
+  <start_on_axis>false</start_on_axis>
+  <number_format>  
+    <letters>
+       <letter number="1000">K</letter>
+       <letter number="1000000">M</letter>
+       <letter number="1000000000">B</letter>
+    </letters>      
+  </number_format>
+  <data_sets> 
+    <data_set did="0">
+       <title>East Stock</title>
+       <short>ES</short>
+       <color>7f8da9</color>
+       <csv>
+         <reverse>true</reverse>
+         <separator>,</separator>
+         <date_format>YYYY-MM-DD</date_format>
+         <decimal_separator>.</decimal_separator>
+         <columns>
+           <column>date</column>
+           <column>volume</column>
+           <column>close</column>
+         </columns>
+         <data>
+         </data>
+       </csv>
+       <events_file_name>events.xml</events_file_name>
+    </data_set>
+  </data_sets>
+  <charts>
+  	<chart cid="first">
+  		<height>60</height>
+  		<title>Cumulative Profit</title>
+      <border_color>#CCCCCC</border_color>
+      <border_alpha>100</border_alpha>
+      <values>
+        <x>
+          <bg_color>EEEEEE</bg_color>
+        </x>   
+      </values>
+      <legend>
+        <show_date>true</show_date>
+      </legend>
+      <events>
+        <show_balloon>true</show_balloon>
+        <color_hover>0099CC</color_hover>
+      </events>
+      <column_width>100</column_width>
+  		<graphs>
+  			<graph gid="Profit">
+  				<data_sources>
+  				  <close>close</close>
+          </data_sources>
+
+  				<bullet>round_outline</bullet>
+  		    <legend>
+            <date key="false" title="false"><![CDATA[{close}]]></date>
+            <period key="false" title="false"><![CDATA[open:<b>{open}</b> low:<b>{low}</b> high:<b>{high}</b> close:<b>{close}</b>]]></period>
+          </legend>         
+  			</graph>  			
+  		</graphs>
+  	</chart>  
+
+  	<chart cid="second">
+  		<height>30</height>
+  		<title>Daily Value Traded</title>
+      <border_color>#CCCCCC</border_color>
+      <border_alpha>100</border_alpha>
+      <grid>
+        <y_left>
+          <approx_count>3</approx_count>
+        </y_left>
+      </grid>
+
+      <values>
+        <x>
+          <enabled>false</enabled>
+        </x>
+      </values>
+
+      <legend>
+        <show_date>false</show_date>
+      </legend>
+
+      <column_width>80</column_width>
+  		<graphs>
+  			<graph gid="0">
+  				<type>column</type>
+  				<data_sources>
+  				  <close>volume</close>
+          </data_sources>
+          <period_value>average</period_value>
+  				<alpha>0</alpha>
+  				<fill_alpha>50</fill_alpha>
+  		    <legend>
+            <date key="false" title="false"><![CDATA[{close}]]></date>
+            <period key="false" title="false"><![CDATA[open:<b>{open}</b> low:<b>{low}</b> high:<b>{high}</b> close:<b>{close}</b>]]></period>
+          </legend>
+  			</graph>
+  		</graphs>
+  	</chart>
+ 
+  </charts>
+
+  <date_formats>
+    <events>DD month YYYY</events>
+  </date_formats>
+
+  <data_set_selector>
+    <enabled>false</enabled>
+  </data_set_selector>
+  
+  <period_selector>
+		<periods>		
+      <period type="DD" count="10">10D</period>
+    	<period type="MM" count="1">1M</period>
+    	<period type="MM" count="3">3M</period>
+    	<period selected="true" type="YYYY" count="1">1Y</period>
+    	<period type="YTD" count="0">YTD</period>
+    	<period type="MAX">MAX</period>
+		</periods>
+		
+		<periods_title>Zoom:</periods_title>
+		<custom_period_title>Custom period:</custom_period_title> 
+  </period_selector>
+
+  <header>
+      <!-- Header text -->
+    <text_size>14</text_size>
+    <text_color>FFFFFF</text_color>
+    <bg_color>000000</bg_color>
+    <bg_alpha>100</bg_alpha>
+  </header>
+  <cursor>
+    <pan>false</pan>
+    <color>#00FF00</color>
+  </cursor>
+  <scroller>
+    <graph_data_source>close</graph_data_source>
+    <resize_button_style>dragger</resize_button_style>
+    <playback>
+      <enabled>true</enabled>
+      <speed>3</speed>
+    </playback>
+  </scroller>
+
+</settings>

@@ -1,0 +1,29 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>Events</title>
+</head>
+<body>
+<!-- saved from url=(0013)about:internet -->
+<!-- amstock script-->
+  <script type="text/javascript" src="amstock/swfobject.js"></script>
+	<div id="flashcontent">
+		<strong>You need to upgrade your Flash Player</strong>
+	</div>
+
+	<script type="text/javascript">
+		// <![CDATA[		
+		var so = new SWFObject("amstock/amstock.swf", "amstock", "100%", "100%", "8", "#FFFFFF");
+		so.addVariable("path", "");
+        //XMLFILE
+		so.write("flashcontent");
+        //so.addVariable("chart_settings", "<cursor><pan>false</pan><color>#00FF00</color></cursor>")
+		// ]]>
+        function amChartInited(chart_id){
+            flashMovie = document.getElementById("amstock");
+            //flashMovie.setCursorMode("zoom");
+        }
+	</script>
+<!-- end of amstock script -->
+</body>
+</html>

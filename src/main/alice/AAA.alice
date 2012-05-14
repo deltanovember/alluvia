@@ -1,0 +1,9 @@
+
+
+
+on trade
+	if time < 10:00:00 then
+		print "[date] [time] [security]"
+	end if
+end on
+

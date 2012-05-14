@@ -1,0 +1,50 @@
+/**************************************************************************************************************************************************************************************************************
+
+Trading Days
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	Trading Days.alice
+ 
+Type:		Data extraction
+
+Description:	This script extracts trading dates.
+
+Input(s):	None
+
+Output(s): 	This program extracts trading dates in the form 'DD/MM/YYYY' 
+		to files in the form 'Trading Days [MKT] YYYY.csv' 
+		where MKT is the exchange identifier and YYYY is the current year of the run.
+		
+Author: 	Matthew Clifton (clifton.matthew@gmail.com)
+
+Date:  	17 May 2011
+
+Version: 	1.0
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+userparams
+
+	MKT : "Name of stock market" : "LSE2";
+
+end userparams
+
+at start
+	
+	declare let filename = "Trading Days [MKT].csv"
+	printcsv filename, "ref_date"
+	
+end at
+
+at daystart
+	
+	if istrading(date) then
+		
+		printcsv filename, date
+		
+	end if
+	
+end at
+

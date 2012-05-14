@@ -1,0 +1,171 @@
+
+at start
+	declare let filename = "ASX_close.csv"
+	
+	printcsv filename, 
+			"Date", 
+			"Security", 
+			"Start", 
+			"End", 
+			"Close", 
+			"Change 1", 
+			"Change 2"
+			
+	declare start_price[security] : price
+	declare end_price[security] : price
+	
+end at
+
+at 15:40:00
+	if istrading(date) and month(date) != month(trday(date,1)) then
+		per security
+			if tcount(date,date) > 300 and value(date,date) > $200000 then
+				start_price[security] = mpprice
+			end if
+		end per
+	end if
+end at
+
+at 15:59:00
+	if istrading(date) and month(date) != month(trday(date,1)) then
+		per security
+			if tcount(date,date) > 300 and value(date,date) > $200000 and value(15:40:00) > $50000 then
+				end_price[security] = mpprice
+			end if
+		end per	
+	end if
+end at
+
+at dayend
+	if istrading(date) then
+		per security
+			if tcount(date,date) > 300 and value(date,date) > $200000 and defined start_price[security] and defined end_price[security] then
+				
+				declare let change_ = 100 * (end_price[security] - start_price[security]) / start_price[security]
+				
+				if abs(change_) > 1 then
+				
+					printcsv filename, 
+						date, 
+						security, 
+						start_price[security], 
+						end_price[security],
+						closeprice(date), 
+						100 * (end_price[security] - start_price[security]) / start_price[security], 
+						100 * (closeprice(date) - end_price[security]) / end_price[security]
+						
+				end if
+					
+			end if
+		end per			
+	end if
+	
+	free start_price[]
+	free end_price[]
+end at
+
+
+
+
+//at start
+//	declare let filename = "ASX_pairx.csv"
+//	
+//	printcsv filename, 
+//			"Date", 
+//			"Time", 
+//			"Type", 
+//			"BHP", 
+//			"RIO", 
+//			"Ratio"
+//			
+//	declare price_[security] : price
+//	declare uncrossing_time[security] : time
+//	
+//end at
+//
+//at daystart
+//	declare let continuous = false
+//end at
+//
+//on mkttrade
+//	price_[security] = mpprice
+//
+//	if security = ^RIO.AX and undefined uncrossing_time[^RIO.AX] then
+//		uncrossing_time[security] = time
+//		printcsv filename, 
+//				date, 
+//				uncrossing_time[security], 
+//				"UT", 
+//				price_[^BHP.AX], 
+//				price_[^RIO.AX], 
+//				number(price_[^BHP.AX]) / number(price_[^RIO.AX])
+//	end if
+//
+//end on
+//
+//every 1 minutes
+//	if defined uncrossing_time[^RIO.AX] and time > uncrossing_time[^RIO.AX] + 10 minutes and not(continuous) then
+//		continuous = true
+//		per security
+//			if security = ^BHP.AX then
+//				declare let BHP_price = mpprice
+//			end if
+//			if security = ^RIO.AX then
+//				declare let RIO_price = mpprice
+//				
+//				printcsv filename, 
+//					date, 
+//					time,
+//					"A", 
+//					BHP_price, 
+//					RIO_price, 
+//					number(BHP_price) / number(RIO_price)
+//			end if
+//		end per
+//	end if	
+//end every
+//
+//at dayend
+//	free price_[]
+//	free uncrossing_time[]
+//end at
+
+
+
+//at start
+//	declare let filename = "ASX_spreads.csv"
+//	
+//	printcsv filename, 
+//			"Security", 
+//			"Spread", 
+//			"Trades", 
+//			"Test"
+//			
+//	declare spread_dist[security] : distribution
+//			
+//end at
+//
+//every 15 minutes
+//		if time >= 10:15:00 and time <= 15:30 then
+//	per security
+//			spread_dist[security] <- spread
+//	end per
+//		end if
+//end every
+//	
+//at dayend
+//	per security
+//		
+//		declare let spread_mean = distaverage(spread_dist[security])
+//		declare let tcount_ = tcount(date,date) 
+//		
+//		if tcount_ > 200 and defined spread_mean then
+//			printcsv filename, 
+//				security, 
+//				spread_mean, 
+//				tcount_, 
+//				spread_mean / tcount_
+//		end if
+//	end per
+//end at
+//

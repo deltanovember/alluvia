@@ -1,0 +1,126 @@
+
+
+userparams
+
+	SECURITY_ : "The security of interest" : ^GAS;
+	BENCHMARK_PERIOD : "Length of benchmark interval" : 5 days;
+
+end userparams
+
+
+#include "config.alice"
+
+
+
+userparams
+
+	SECURITY_ : "The security of interest" : ^GAS;
+	BENCHMARK_PERIOD : "Length of benchmark interval" : 5 days;
+
+end userparams
+
+
+#include "config.alice"
+
+declare trading_activity[security] : value
+declare trading_activity_mean[security] : number
+
+on trade
+	trading_activity[security] += value
+end on
+
+at dayend
+	per security
+		if security = SECURITY_ then
+			print "Current day: [trading_activity[security]] Benchmark period: [trading_activity_mean[security]]"
+		end if
+	end per
+end at
+
+
+#------------- BENCHMARK SECTION --------------
+
+benchmarks_below : BENCHMARK_PERIOD
+
+at start
+	declare trading_activity_dist[security] : distribution
+end at
+
+on trade
+	trading_activity_dist[security] <- value
+end on
+
+at end
+	per security
+		trading_activity_mean[security] = distaverage(trading_activity_dist[security])
+	end per
+end at
+
+
+
+//
+//declare trading_activity[security,house,string] : value
+////declare trading_activity_mean[security,house,string] : number
+//
+//on trade
+//	if security = SECURITY_ then
+//		//print "[initiatorh] [buyerh] [sellerh]"
+//		if initiatorh =  buyerh then
+//			declare let side_ = FLAG_BUY_SIDE
+//			declare let house_ = buyerh
+//		else
+//			declare let side_ = FLAG_SELL_SIDE
+//			declare let house_ = sellerh
+//		end if
+//			
+//		trading_activity[security,house_,side_] += value
+//	end if
+//end on
+//
+//at dayend
+//	per security
+//		if security = SECURITY_ then
+//			per house
+//				print "[security] [house]"
+//			end per
+//		end if
+////		if sechouse_security = SECURITY_ then
+////			//print "[date] [sechouse_security] [sechouse_house] [trading_activity[sechouse_security,sechouse_house,FLAG_BUY_SIDE]] [trading_activity_mean[sechouse_security,sechouse_house,FLAG_BUY_SIDE]]"
+////			//print "[date] [sechouse_security] [sechouse_house] [trading_activity[sechouse_security,sechouse_house,FLAG_SELL_SIDE]] [trading_activity_mean[sechouse_security,sechouse_house,FLAG_SELL_SIDE]]"
+////		end if
+//	end per
+//end at
+//
+////
+////#------------- BENCHMARK SECTION --------------
+////
+////benchmarks_below : BENCHMARK_PERIOD
+////
+////at start
+////	declare trading_activity_dist[security,house,string] : distribution
+////end at
+////
+////on trade
+////	if security = SECURITY_ then
+////		
+////		if getSide() = FLAG_BUY_SIDE then
+////			declare let side_ = FLAG_BUY_SIDE
+////			declare let house_ = buyerh
+////		else
+////			declare let side_ = FLAG_SELL_SIDE
+////			declare let house_ = sellerh
+////		end if
+////		
+////		trading_activity_dist[security,house_,side_] <- value
+////	end if
+////end on
+////
+////at end
+////	per sechouse
+////		if sechouse_security = SECURITY_ then
+////			trading_activity_mean[sechouse_security,sechouse_house,FLAG_BUY_SIDE] = distaverage(trading_activity_dist[sechouse_security,sechouse_house,FLAG_BUY_SIDE])
+////			trading_activity_mean[sechouse_security,sechouse_house,FLAG_SELL_SIDE] = distaverage(trading_activity_dist[sechouse_security,sechouse_house,FLAG_SELL_SIDE])
+////		end if
+////	end per
+////end at
+

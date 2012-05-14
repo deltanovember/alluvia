@@ -1,0 +1,34 @@
+
+// CURRENT DAY
+at start
+	declare let security_ = ^BLT.L
+	declare counter[security] : number
+end at
+
+at dayend
+	with security_
+		print "[date] [security] [counter[security]] [tcount(date,date)]"
+	end with
+end at
+
+// BENCHMARK DAYS
+benchmarks_below : 3 trdays
+
+at start
+	declare let security_ = ^BLT.L
+end at
+
+on mkttrade
+	if security = security_ then
+		counter[security] += 1
+	end if
+end on
+
+at dayend
+	with security_
+		print "[date] [security] [counter[security]] [tcount(date,date)]"
+	end with
+end at
+
+
+

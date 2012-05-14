@@ -1,0 +1,155 @@
+
+
+#include "config.alice"
+
+at start
+	
+	declare let max_trade_value = 15000 	// $
+	declare let brokerage = 10		// bps
+	declare let total_profit = 0 		// $
+	declare let min_price = $0.10
+	declare let max_price = $0.50
+	declare let min_close_value = $200000
+	
+	// Init
+	declare security_list[security] : boolean
+	declare last_bid[security,date] : price
+	declare last_ask[security,date] : price
+	declare direction[security,date] : string
+	declare close_value[security,date] : zeroed value
+	
+	declare let filename = "solo.csv"
+	printcsv filename, 
+			"date", 
+			"security", 
+			"pClosePrice", 
+			"direction", 
+			"openPrice", 
+			"entryTradeValue", 
+			"exitTradeValue", 
+			"grossProfit", 
+			"brokerage", 
+			"netProfit", 
+			"percent", 
+			"totalProfit", 
+			"closeValue"
+	
+	// Security list
+	security_list[^SDL.AX] = true
+	security_list[^VBA.AX] = true
+	
+end at
+
+on trade, quote
+	//if security_list[security] then
+	if price < max_price and price > min_price then
+		if time <= 16:00:00 then
+			last_bid[security,date] = bid
+			last_ask[security,date] = ask
+		else
+			declare let mid = (last_bid[security,date] + last_ask[security,date]) / 2
+			if closeprice(date) >= mid then
+				direction[security,date] = "SELL"
+			else
+				direction[security,date] = "BUY"
+			end if
+		end if		
+	end if
+end on
+
+on trade
+	//if security_list[security] then
+	if price < max_price and price > min_price then
+		
+		// Close volume
+		close_value[security,date] += value
+		
+	end if
+end on
+
+at dayend
+	
+	per security
+
+		if defined direction[security,yesterday] then //and close_value[security,yesterday] > min_close_value then
+		
+			declare let entry_price = number(closeprice(yesterday))
+			declare let exit_price = number(openprice(date))
+			declare let trade_volume = floor(max_trade_value / exit_price)
+			declare let entry_trade_value = entry_price * trade_volume
+			declare let exit_trade_value = exit_price * trade_volume
+			declare let brokerage_cost = (entry_trade_value + exit_trade_value) * 10 / 100 / 100
+			//print "[date] [security] [entry_price] [exit_price] [trade_volume] [entry_trade_value] [exit_trade_value] [brokerage_cost]"
+			
+			if direction[security,yesterday] = "BUY" then
+				declare let gross_profit = exit_trade_value - entry_trade_value
+			else
+				declare let gross_profit = entry_trade_value - exit_trade_value
+			end if
+
+			declare let net_profit = gross_profit - brokerage_cost
+			declare let percent_ = 100 * net_profit / entry_trade_value
+			total_profit += net_profit
+
+			printcsv filename, 
+					date, 
+					security, 
+					entry_price, 
+					direction[security,yesterday], 
+					exit_price, 
+					entry_trade_value, 
+					exit_trade_value, 
+					gross_profit, 
+					brokerage_cost, 
+					net_profit, 
+					percent_, 
+					total_profit, 
+					close_value[security,yesterday]
+					
+			print "[date] [total_profit]"
+				
+			end if
+			
+			last_bid[security,yesterday] = dummyprice
+			last_ask[security,yesterday] = dummyprice
+			direction[security,yesterday] = dummystring
+			close_value[security,yesterday] = dummyvalue
+			direction[security,yesterday] = dummystring
+				
+	end per
+	
+end at
+		
+at end
+	print ""
+	print "*************************************************"
+	print ""
+	print "Total profit: $[total_profit]"
+	print ""
+	print "*************************************************"
+	print ""
+
+end at
+
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

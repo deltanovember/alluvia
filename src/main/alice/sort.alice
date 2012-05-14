@@ -1,0 +1,30 @@
+
+
+
+// 1. multicolsort(args)
+//     The syntax is:
+//     multicolsort keytype1, keytype2, ..., keytypeM, inarr1, inarr2, inarr3, ... , inarrN, retarr1, retarr2, ... , retarrM
+//
+//1. Multicolsort doesn't re-arrange original arrays. Instead, it saves the keys from sorted input arrays to a set of empty return arrays (retarr).
+//2. The index of each inarr are key1, key2, ..., keyM 
+//3. The key(s) of inarr1 to inarrN must be identical.
+//4. The key(s) of retarr1 to retarrM must be a one-dimensional number type.
+//5. There must be as many retarr as there are the number of keys in inarr.
+//6. Every inarr must be of the same size.
+//7. Data type for retarrm is the M-th key of inarr.
+//    e.g. Data type for retarr1 is the first key of inarr.
+//8. Multicolsort knows initial position of retarr1 because the number of return arrays is same as the number of key types.
+
+at start
+	
+	declare myArray[number] : number
+	declare myNewArray[number] : number
+	
+	myarray[1] = 2
+	myarray[2] = 3
+	myarray[3] = 1
+
+	multicolsort number,myArray[],myNewArray[]
+
+end at
+

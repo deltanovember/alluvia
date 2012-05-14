@@ -1,0 +1,150 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>RtdStockClient</name>
+    </assembly>
+    <members>
+        <member name="T:RtdStockClient.ProquoteSocketRtdDataHandler">
+            <summary>
+            Proquote socket RTD data handler. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="F:RtdStockClient.ProquoteSocketRtdDataHandler._logger">
+            <summary> The logger </summary>
+        </member>
+        <member name="M:RtdStockClient.ProquoteSocketRtdDataHandler.#ctor(System.String,System.Int32,System.String,System.Int32,BitFactory.Logging.Logger)">
+            <summary>
+            Initializes a new instance of the <see cref="T:RtdStockClient.ProquoteSocketRtdDataHandler"/> class. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="ip">
+            The IP address to connect to. 
+            </param>
+            <param name="port">
+            The port to connect to. 
+            </param>
+            <param name="sendFormat">
+            The send format. 
+            </param>
+            <param name="sendDelay">
+            The number of ms to delay after each socket send operation to give Java enough time to sync up.
+            </param>
+            <param name="logger">
+            The logger. 
+            </param>
+        </member>
+        <member name="M:RtdStockClient.ProquoteSocketRtdDataHandler.Close">
+            <summary> Closes this object. </summary>
+            <remarks> Ben McClure, 7/8/2011. </remarks>
+        </member>
+        <member name="M:RtdStockClient.ProquoteSocketRtdDataHandler.Handle(System.Object[0:,0:])">
+            <summary>
+            Handles RTD data. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="rtdData">
+            Information describing the RTD data returned. 
+            </param>
+        </member>
+        <member name="P:RtdStockClient.ProquoteSocketRtdDataHandler.SendDelay">
+            <summary> Gets or sets the send delay. </summary>
+            <value> The send delay. </value>
+        </member>
+        <member name="P:RtdStockClient.ProquoteSocketRtdDataHandler.SendFormat">
+            <summary> Gets or sets the send format. </summary>
+            <value> The send format. </value>
+        </member>
+        <member name="P:RtdStockClient.ProquoteSocketRtdDataHandler.Topics">
+            <summary> Gets or sets the topics. </summary>
+            <value> The topics. </value>
+        </member>
+        <member name="T:RtdStockClient.Program">
+            <summary>
+            The main application class. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="F:RtdStockClient.Program.RtdClient">
+            <summary> The RTD client </summary>
+        </member>
+        <member name="F:RtdStockClient.Program._configSource">
+            <summary> The configuration source </summary>
+        </member>
+        <member name="F:RtdStockClient.Program._logger">
+            <summary> The logger </summary>
+        </member>
+        <member name="M:RtdStockClient.Program.Main(System.String[])">
+            <summary> Main entry-point for this application. </summary>
+            <remarks> Ben McClure, 5/16/2011. </remarks>
+            <param name="args"> Array of command-line argument strings. </param>
+        </member>
+        <member name="M:RtdStockClient.Program.GetTopics(Nini.Config.IConfig)">
+            <summary>
+            Gets the topics from the provided config source. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/14/2011. 
+            </remarks>
+            <param name="configNode">
+            The configuration node. 
+            </param>
+            <returns>
+            The topics. 
+            </returns>
+        </member>
+        <member name="M:RtdStockClient.Program.Exit(System.Int32)">
+            <summary> Exits. </summary>
+            <remarks> Ben McClure, 7/8/2011. </remarks>
+            <param name="exitCode"> The exit code. </param>
+        </member>
+        <member name="T:RtdStockClient.ProquoteRtdClient">
+            <summary>
+            The Proquote RTD client.
+            </summary>
+        </member>
+        <member name="M:RtdStockClient.ProquoteRtdClient.#ctor(SingularityShift.Rtd.IRtdServerController,System.Collections.Generic.IDictionary{System.Int32,System.Object[]},SingularityShift.Rtd.IRtdDataHandler,System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:RtdStockClient.ProquoteRtdClient"/> class. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/14/2011. 
+            </remarks>
+            <param name="rtdServer">
+            The RTD server. 
+            </param>
+            <param name="topics">
+            The topics. 
+            </param>
+            <param name="dataHandler">
+            The data handler. 
+            </param>
+            <param name="heartbeatInterval">
+            The heartbeat interval. 
+            </param>
+        </member>
+        <member name="M:RtdStockClient.ProquoteRtdClient.ProcessData(System.Object[0:,0:])">
+            <summary>
+            Process the data described by data. Usually, this is the function that should be called to handle new data after it has been received. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/14/2011. 
+            </remarks>
+            <param name="data">
+            The data received from the RTD server. 
+            </param>
+        </member>
+        <member name="P:RtdStockClient.ProquoteRtdClient.DataHandler">
+            <summary> Gets or sets the data handler. </summary>
+            <value> The data handler. </value>
+        </member>
+    </members>
+</doc>

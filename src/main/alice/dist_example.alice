@@ -1,0 +1,32 @@
+
+
+
+on quote
+	
+	if time > 10:20:00 and time < 10:21:00 then
+		if security = ^BHP.AX then
+			print "[price] [volume] [bid] [ask]"
+		end if
+	end if
+end on
+//
+//at start
+//	declare my_dist[security] : distribution
+//end at
+//
+//on trade
+//	my_dist[security] <- price
+//end on
+//
+//at end
+//	per security
+//		if defined my_dist[security] then 
+//			print "[security] [distaverage(my_dist[security])]"
+//			//print diststdev(my_dist[security])
+//			//print distmax(my_dist[security])
+//			//print distmin(my_dist[security])
+//			//print distcutoff(my_dist[security],10%)
+//		end if
+//	end per
+//end at
+//	

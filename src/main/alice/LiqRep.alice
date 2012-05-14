@@ -1,0 +1,320 @@
+/**************************************************************************************************************************************************************************************************************
+
+iRev Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	iRev Extractor.alice
+ 
+Type:		Pattern recognition and data extraction
+
+Description:	This script extracts bid and ask prices before and after liquidity shocks. A liquidity shock is defined as a trade which results in widening of the spread.
+
+Input(s):	Trade and Quote market data
+
+Output(s): 	This program extracts data to files in the form 'LiqRep [MKT] YYYYMM.csv' where MKT is the exchange 
+		identifier and the YYYYMM is the year followed by each month of the run.
+		
+Author: 	Matthew Clifton (matthew.clifton@alluvialtrading.com), Don Nguyen (don.nguyen@alluvialtrading.com)
+
+Date:  	24 October 2011
+
+Version: 	2.2
+
+History:    24-Oct-2011 DN  Free variables at day end to fix multiday bug
+            23-Oct-2011 DN  Replace printcsv with printto for unlimited columns
+            19-Oct-2011 MC  Initial release
+
+Notes: 
+
+*************************************************************************************************************************************************************************************************************/
+
+
+#include "config.alice"
+
+#define ACTIVE_STOCK (defined sec2num[security])// and (security = ^AAL.L or security = ^VOD.L))
+#define CONTINUOUS_TRADING (time > open_auction_end[mkt[marketcode]] and time < continuous_end[mkt[marketcode]])
+#define LIQUIDITY_SHOCK_ (defined bid and defined ask and defined bidbefore and defined askbefore and spread_ > spread_before)
+#define DATA_VALID (bid < ask)
+
+userparams
+	
+	N_EVENTS : "The number of events each before and after a liquidity shock" : 50;
+	DEBUG_MODE : "Specify a security to debug" : false;
+	DEBUG_SECURITY : "Specify a security to debug" : ^AAL.L;
+
+end userparams
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	
+	// Declare arrays
+	declare n[security] : zeroed number
+	declare bid_[security,number] : price
+	declare ask_[security,number] : price		
+	declare time_[security,number] : time
+	declare transtype_[security,number] : string
+	declare trade_price_volume[security,number] : value
+	declare trade_volume[security,number] : volume
+	declare sec2num[security] : number
+	declare event_key[security,date] : time
+	
+	// Print output file headings
+	declare let filename = "Liquidity Replenishment [dateStrFile()].csv"
+
+	// Headers
+	printto filename, "security_id,p_tcount,p_value,trade_vwap,trade_volume,initiator"...
+	for declare let k = 1 ; k <= N_EVENTS ; k += 1 do
+		printto filename, ",transtype[k],time[k],bid[k],ask[k]"...
+	end for
+	for declare let k = N_EVENTS+1 ; k <= 2*N_EVENTS ; k += 1 do
+		printto filename, ",bid[k],ask[k]"...
+	end for
+	printto filename, ""
+
+end at
+
+
+// =======================================================================================================================================
+// 	FUNCTIONS
+// =======================================================================================================================================
+
+function getTranstype() : string
+	declare let trans = dummystring
+	if transtype = "QUOTE" then trans = "Q" elsif transtype = "TRADE" then trans = "T" end if
+	return trans
+end getTranstype
+
+
+// Gather observations
+// ---------------------------------------------------------------------------------------------------------------------------------
+on quote, mkttrade
+
+	if ACTIVE_STOCK and CONTINUOUS_TRADING and DATA_VALID then
+
+		if getTranstype = "Q" then
+			n[security] += 1
+		elsif getTranstype = "T" then
+			// Unique trade event (consolidate trades with the same timestamp)
+			if time != time_[security,n[security]] or transtype_[security,n[security]] = "Q" then
+				n[security] += 1
+			end if
+		end if
+		
+		// Take observations
+//		bid_[security,n[security]] = bid
+//		ask_[security,n[security]] = ask
+		if defined bid then
+			bid_[security,n[security]] = bid
+		else
+			if defined bid_[security,n[security]-1] then
+				bid_[security,n[security]] = bid_[security,n[security]-1]
+			else
+				bid_[security,n[security]] = trueprice
+			end if
+		end if
+		if defined ask then
+			ask_[security,n[security]] = ask
+		else
+			if defined ask_[security,n[security]-1] then
+				ask_[security,n[security]] = ask_[security,n[security]-1]
+			else
+				ask_[security,n[security]] = trueprice
+			end if
+		end if
+		time_[security,n[security]] = time
+		transtype_[security,n[security]] = getTranstype
+		trade_price_volume[security,n[security]] += price * volume
+		trade_volume[security,n[security]] += volume
+		
+	end if
+	
+end on
+
+
+// Print liquidity shock event data
+// ---------------------------------------------------------------------------------------------------------------------------------
+at dayend
+	
+	// Get list of liquidity shocks
+	per security
+		if ACTIVE_STOCK then
+		
+			// For every observation
+			declare let i_min = N_EVENTS
+			declare let i_max = n[security]-N_EVENTS
+			for declare let i = i_min ; i <= i_max ; i += 1 do
+			
+				// IF liquidity shock THEN
+				declare let last_spread = 200 * (ask_[security,i-1] - bid_[security,i-1]) / (ask_[security,i-1] + bid_[security,i-1])
+				declare let current_spread = 200 * (ask_[security,i] - bid_[security,i]) / (ask_[security,i] + bid_[security,i])
+				if current_spread > last_spread and transtype_[security,i] = "Q" and transtype_[security,i-1] = "T" and time_[security,i] = time_[security,i-1] then
+					
+					// Calculate trade price
+					declare let trade_vwap = trade_price_volume[security,i-1] / trade_volume[security,i-1]
+					
+					// Determine whether buyer or seller initiated
+					if trade_vwap >= ask_[security,i-1] then declare let side = "B" else declare let side = "S" end if
+					
+					// Print or not print
+					//if rand(0,1) > 0.5 then
+					
+//						if security = ^SHP.L then
+//							print "BEFORE [time_[security,i]] [event_key[security,date]] [time_[security,i-N_EVENTS+1]]"
+//						end if
+					
+						if undefined event_key[security,date] or time_[security,i-N_EVENTS+1] > (event_key[security,date] + rand(10,20) minutes) then
+					
+							// Bundle liquidity shock data
+							printto filename, "[sec2num[security]],[tcount(yesterday,yesterday)],[value(yesterday,yesterday)],[trade_vwap],[number(trade_volume[security,i-1])],[side]"...
+							for declare let k = i-N_EVENTS+1 ; k <= i ; k += 1 do
+								//if security = ^ITRK.L then //and time_[security,k] > 08:04:26.20 and time_[security,k] < 08:04:26.40 then
+								//	print "L [i] [k] [trade_vwap] [trade_volume[security,i-1]] [transtype_[security,k]];[time_[security,k]];[number(bid_[security,k])];[number(ask_[security,k])]"...
+								//end if
+								printto filename, ",[transtype_[security,k]],[time_[security,k]],[number(bid_[security,k])],[number(ask_[security,k])]"...
+							end for
+							for declare let k = i+1 ; k <= i+N_EVENTS ; k += 1 do
+								printto filename,",[number(bid_[security,k])],[number(ask_[security,k])]"...
+							end for
+							printto filename, ""
+							
+							// Store event key
+							event_key[security,date] = time_[security,k]
+							
+//							if security = ^SHP.L then
+//								print "***************** INSIDE [time_[security,i]] [event_key[security,date]] [time_[security,i-N_EVENTS+1]]"
+//							end if
+							
+						end if
+					
+					//end if
+					
+				end if
+				
+			end for
+			
+		end if
+	end per
+
+	free n[]
+	free bid_[]
+	free ask_[]
+	free time_[]
+	free transtype_[]
+	free trade_price_volume[]
+	free trade_volume[]
+	free event_key[]
+	
+end at
+
+at start
+	
+	// Stock list
+	sec2num[^AAL.L] = 1
+	sec2num[^ABF.L] = 2
+	sec2num[^ADML.L] = 3
+	sec2num[^AGGK.L] = 4
+	sec2num[^AMEC.L] = 5
+	sec2num[^ANTO.L] = 6
+	sec2num[^ARM.L] = 7
+	sec2num[^ASHM.L] = 8
+	sec2num[^AV.L] = 9
+	sec2num[^AZN.L] = 10
+	sec2num[^BAES.L] = 11
+	sec2num[^BARC.L] = 12
+	sec2num[^BATS.L] = 13
+	sec2num[^BG.L] = 14
+	sec2num[^BLND.L] = 15
+	sec2num[^BLT.L] = 16
+	sec2num[^BNZL.L] = 17
+	sec2num[^BP.L] = 18
+	sec2num[^BRBY.L] = 19
+	sec2num[^BSY.L] = 20
+	sec2num[^BT.L] = 21
+	sec2num[^CCL.L] = 22
+	sec2num[^CNA.L] = 23
+	sec2num[^CNE.L] = 24
+	sec2num[^CPG.L] = 25
+	sec2num[^CPI.L] = 26
+	sec2num[^CSCG.L] = 27
+	sec2num[^DGE.L] = 28
+	sec2num[^EMG.L] = 29
+	sec2num[^ENRC.L] = 30
+	sec2num[^ESSR.L] = 31
+	sec2num[^EXPN.L] = 32
+	sec2num[^FRES.L] = 33
+	sec2num[^GFS.L] = 34
+	sec2num[^GKN.L] = 35
+	sec2num[^GLEN.L] = 36
+	sec2num[^GSK.L] = 37
+	sec2num[^HMSO.L] = 38
+	sec2num[^HRGV.L] = 39
+	sec2num[^HSBA.L] = 40
+	sec2num[^IAP.L] = 41
+	sec2num[^ICAG.L] = 42
+	sec2num[^IHG.L] = 43
+	sec2num[^IMI.L] = 44
+	sec2num[^IMT.L] = 45
+	sec2num[^INVP.L] = 46
+	sec2num[^IPR.L] = 47
+	sec2num[^ISA.L] = 48
+	sec2num[^ITRK.L] = 49
+	sec2num[^ITV.L] = 50
+	sec2num[^JMAT.L] = 51
+	sec2num[^KAZ.L] = 52
+	sec2num[^KGF.L] = 53
+	sec2num[^LAND.L] = 54
+	sec2num[^LGEN.L] = 55
+	sec2num[^LLOY.L] = 56
+	sec2num[^LMI.L] = 57
+	sec2num[^MGGT.L] = 58
+	sec2num[^MKS.L] = 59
+	sec2num[^MRW.L] = 60
+	sec2num[^NG.L] = 61
+	sec2num[^NXT.L] = 62
+	sec2num[^OML.L] = 63
+	sec2num[^PFC.L] = 64
+	sec2num[^PRU.L] = 65
+	sec2num[^PSON.L] = 66
+	sec2num[^RB.L] = 67
+	sec2num[^RBS.L] = 68
+	sec2num[^RDSa.L] = 69
+	sec2num[^RDSb.L] = 70
+	sec2num[^REL.L] = 71
+	sec2num[^REX.L] = 72
+	sec2num[^RIO.L] = 73
+	sec2num[^RR.L] = 74
+	sec2num[^RRS.L] = 75
+	sec2num[^RSA.L] = 76
+	sec2num[^RSL.L] = 77
+	sec2num[^SAB.L] = 78
+	sec2num[^SBRY.L] = 79
+	sec2num[^SDR.L] = 80
+	sec2num[^SDRt.L] = 81
+	sec2num[^SGE.L] = 82
+	sec2num[^SHP.L] = 83
+	sec2num[^SL.L] = 84
+	sec2num[^SMIN.L] = 85
+	sec2num[^SN.L] = 86
+	sec2num[^SRP.L] = 87
+	sec2num[^SSE.L] = 88
+	sec2num[^STAN.L] = 89
+	sec2num[^SVT.L] = 90
+	sec2num[^TATE.L] = 91
+	sec2num[^TLW.L] = 92
+	sec2num[^TSCO.L] = 93
+	sec2num[^ULVR.L] = 94
+	sec2num[^UU.L] = 95
+	sec2num[^VED.L] = 96
+	sec2num[^VOD.L] = 97
+	sec2num[^WEIR.L] = 98
+	sec2num[^WOS.L] = 99
+	sec2num[^WPP.L] = 100
+	sec2num[^WTB.L] = 101
+	sec2num[^XTA.L] = 102
+
+end at
+

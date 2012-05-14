@@ -1,0 +1,42 @@
+
+
+#include "config.alice"
+
+at start
+	
+	declare let filename = "eventTester.csv"
+	printcsv filename, "date", "time", "security", "transtype", "price", "volume", "bidbefore", "askbefore", "bid", "ask", "bidvolbefore", "askvolbefore", "bidvol", "askvol"
+	
+	declare bidvol_before[security] : volume
+	declare askvol_before[security] : volume
+
+end at
+
+on quote, mkttrade
+	
+	if defined bidvol_before[security] and defined askvol_before[security] then
+	
+		if time > 08:00:30 and time < 16:30:00 then
+			if security = ^ANTO.L then
+				if time > 16:00:00 and time < 16:30:00 then
+					print "[date] [time] [security] [transtype] [price] [volume] : [bidbefore] [askbefore] : [bid] [ask] : [bidvol_before[security]] [askvol_before[security]] : [quotevolbid] [quotevolask]"
+				end if
+				printcsv filename, date, "t[time]", security, transtype, price, volume, bidbefore, askbefore, bid, ask, bidvol_before[security], askvol_before[security], quotevolbid, quotevolask
+			end if
+		end if
+	
+	end if
+
+	if transtype = "QUOTE" then
+		bidvol_before[security] = quotevolbid
+		askvol_before[security] = quotevolask
+	end if
+	
+end on
+
+at dayend
+	free bidvol_before[]
+	free askvol_before[]
+end at
+
+

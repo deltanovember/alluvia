@@ -1,0 +1,423 @@
+/**************************************************************************************************************************************************************************************************************
+
+Full Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	AllData
+ 
+Type:		Data extraction
+
+Description:	Extracts trade and quote data
+
+Input(s):	config.alice
+
+Output(s): 	csv file
+		
+Authors: 	Matthew Clifton, Don Nguyen
+
+Date:  	6 October 2011
+
+Version: 	1.8
+
+History: 	...
+		06/10/2011 v1.7 : 	Rearranged buy/sell/bid/ask tags, added open auction match events, added transid
+		11/10/2011 v1.8 : 	Added extra minute to cutoff time used to include close trades owing to bad data, close volume and value are now summed on trade, 
+					added continuous trigger to help distinguish the end of a series of open auction trades
+
+*************************************************************************************************************************************************************************************************************/
+
+#include "config.alice"
+
+// =======================================================================================================================================
+// 	USER PARAMS
+// =======================================================================================================================================
+
+userparams
+
+	PRINT_HEADER : "Print first row of CSV with headers" : false;
+	MAX_VOLUME : "Filter out bad data" : x100000000;
+	TIME_LAG : "Reuters data time lag" : 0.5 seconds;
+
+end userparams
+
+
+// =======================================================================================================================================
+// 	FUNCTIONS
+// =======================================================================================================================================
+
+// Print to file
+function print2csv(filename : string, transtype_ : string, datetime : string, security_ : string, category : string, transid_ : number, price_ : price, volume_ : volume, value_ : value, tagfields : string)
+	
+	//if transtype_ = "CONTROL" or security = ^SVW.AX then// or security = ^KZL.AX then
+		
+		printcsv filename, 
+				transtype_, 
+				datetime, 
+				security_, 
+				category, 
+				10 * transid_, 
+				number(price_) /scale_price[mkt[marketcode]], 
+				volume_, 
+				number(value_) / scale_value[mkt[marketcode]], 
+				tagfields
+
+	//end if
+
+end print2csv
+		
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	declare last_month : number
+end at
+
+at daystart
+
+	// Get today's date
+	declare let dateString = dateStr(date)
+	
+	// at month start
+	if undefined last_month or last_month != month(date) then
+		
+		last_month = month(date)
+
+		// Print output file headings
+		declare let filename_all = "alldata[mkt[marketcode]][dateStrFile()].csv"
+		
+		if (PRINT_HEADER) then
+				
+			printcsv filename_all, 
+				"transtype", 
+				"datetime",
+				"security", 
+				"category", 
+				"transid", 
+				"price",
+				"volume", 
+				"value", 
+				"tagfields"
+				
+		end if
+
+	end if
+
+	declare last_bid[security] : price
+	declare last_ask[security] : price
+	declare last_bidvol[security] : volume
+	declare last_askvol[security] : volume
+	
+	declare continuous[security] : zeroed boolean
+	
+	declare open_time[security] : time
+	declare open_volume[security] : volume
+	declare open_value[security] : value
+	declare open_match_count[security] : number
+	declare open_match_time[security,number] : time
+	declare open_match_transid[security,number] : number
+	
+	declare close_time[security] : time
+	declare close_volume[security] : volume
+	declare close_value[security] : value
+	declare close_match_count[security] : number
+	declare close_match_time[security,number] : time
+	declare close_match_transid[security,number] : number
+
+end at
+
+
+// =======================================================================================================================================
+// 	DATA
+// =======================================================================================================================================
+
+// Print start of day message
+at daystart
+	if istrading(date) then
+		
+		// Control message
+		// -----------------------------------------------------------------------------------------------
+		print2csv(filename_all, 
+			"CONTROL", 
+			"[dateString] 00:00:00.001", 
+			dummystring, 
+			dummystring, 
+			dummynumber, 
+			dummyprice, 
+			dummyvolume, 
+			dummyvalue, 
+			"STARTOFDAY")
+	end if
+end at
+
+// Print trade data
+on mkttrade
+	
+	// If quotes exist (shouldn't be necessary but is required to filter some bad data, e.g. TE25.L 2011/01/04)
+	if defined last_ask[security] and defined last_ask[security] and defined last_bidvol[security] and defined last_askvol[security] then
+	
+		declare let buy_or_sell_ = getSide()
+		declare let uncrossing_trade_ = ""
+		declare let time_ = time
+		
+//		if security = ^VOD.L then
+//			print "[transtype] [date] [time] [security] [bid] [ask] [price] [volume] [value] [buy_or_sell_]"
+//		end if
+
+		// Determine opening trade time
+		if not(continuous[security]) and price = openprice(date) and time > (getASXOpenTime() - random_time[mkt[marketcode]]) and time < (getASXOpenTime() + random_time[mkt[marketcode]]) and undefined open_time[security] then
+			open_time[security] = time
+		end if
+		
+		if defined open_time[security] then
+			uncrossing_trade_ = " [FLAG_UNCROSSING_TRADE]"
+			buy_or_sell_ = ""
+			time_ = open_time[security]
+			open_volume[security] += volume
+			open_value[security] += openprice(date) * open_volume[security]
+		end if
+
+		// Determine whether or not this a late continuous trade (e.g. 16:00:00.638)
+		if continuous[security] and time >= continuous_end[mkt[marketcode]] and time < continuous_end[mkt[marketcode]] + 1 minutes then
+			time_ = continuous_end[mkt[marketcode]] - 0.001 seconds
+		end if
+
+		// Determine whether or not this a closing trade
+		if undefined close_time[security] and time > (continuous_end[mkt[marketcode]] + 1 minutes) and price = closeprice(date) then
+			close_time[security] = time
+		end if
+		
+		if defined close_time[security] then
+			uncrossing_trade_ = " [FLAG_UNCROSSING_TRADE]"
+			buy_or_sell_ = ""
+			time_ = close_time[security]
+			close_volume[security] += volume
+			close_value[security] += price * close_volume[security]
+		end if
+		
+		// Trade message
+		// -----------------------------------------------------------------------------------------------
+		//if uncrossing_trade_ = " UT" then
+		print2csv(filename_all, 
+			"TRADE", 
+			"[dateString] [time_]", 
+			"[security]", 
+			"E", 
+			transid, 
+			price, 
+			volume, 
+			value, 
+			"[buy_or_sell_][uncrossing_trade_]")
+		//end if
+			
+	end if
+			
+end on
+
+// Print quote data
+on quote
+	
+	// Use time to help distinguish the end of a series of open auction trades
+	if defined open_time[security] and time > (open_time[security] + TIME_LAG) or time > (getASXOpenTime() + random_time[mkt[marketcode]]) then
+		continuous[security] = true
+		open_time[security] = dummytime
+	end if
+
+	//if defined open_time[security] then
+		// do nothing (don't print quote messages during lagged open trades))
+	if undefined bid and undefined ask then
+		// do nothing
+	elsif (defined bid and undefined quotevolbid) or (defined ask and undefined quotevolask) then
+		// do nothing
+	elsif (defined quotevolbid and quotevolbid > MAX_VOLUME) or (defined quotevolask and quotevolask > MAX_VOLUME) then
+		// do nothing
+	elsif (defined bid and quotevolbid>x0) or (defined ask and quotevolask>x0) then
+		
+		// Default, first quote of the day and both the bid and ask are defined - make it a buy order
+		declare let price_ = bid
+		declare let volume_ = quotevolbid
+		declare let bid_or_ask_ = FLAG_BID_SIDE
+		
+		// First quote of the day and is a sell order
+		if undefined bid and defined ask then
+			price_ = ask
+			volume_ = quotevolask
+			bid_or_ask_ = FLAG_ASK_SIDE
+		end if
+		
+		// First quote of the day and is a buy order
+		if undefined ask and defined bid then
+			price_ = bid
+			volume_ = quotevolbid
+			bid_or_ask_ = FLAG_BID_SIDE
+		end if
+		
+		// Quote is a sell order change
+		if ask != last_ask[security] or quotevolask != last_askvol[security] then
+			price_ = ask
+			volume_ = quotevolask
+			bid_or_ask_ = FLAG_ASK_SIDE
+		end if
+		
+		// Quote is a buy order change
+		if bid != last_bid[security] or quotevolbid != last_bidvol[security] then
+			price_ = bid
+			volume_ = quotevolbid
+			bid_or_ask_ = FLAG_BID_SIDE
+		end if
+	
+		// Update last quote data
+		last_bid[security] = bid
+		last_ask[security] = ask
+		last_bidvol[security] = quotevolbid
+		last_askvol[security] = quotevolask
+
+//		if security=^DOPL.L then
+//			print "[transid] [transtype] [date] [time] [security] [bid] [ask] [quotevolbid] [quotevolask] [price_] [volume_] [price_*volume_] [bid_or_ask_] [last_bid[security]] [last_ask[security]] [last_bidvol[security]] [last_askvol[security]]"
+//		end if
+//		if security=^LSE.L then
+//			print "[transid] [transtype] [date] [time] [security] [bid] [ask] [quotevolbid] [quotevolask] [price_] [volume_] [price_*volume_] [bid_or_ask_] [last_bid[security]] [last_ask[security]] [last_bidvol[security]] [last_askvol[security]]"
+//		end if
+		
+		// Quote message
+		// -----------------------------------------------------------------------------------------------
+		//if uncrossing_trade_ = " UT" then
+		print2csv(filename_all, 
+			"ENTORD", 
+			"[dateString] [time]",
+			"[security]", 
+			"E", 
+			transid, 
+			price_, 
+			volume_, 
+			price_*volume_, 
+			"[bid_or_ask_]")
+		//end if
+	
+		// IF this is the open auction THEN store indicative price and volume events to insert at dayend
+		if undefined open_volume[security] and time > open_auction_start[mkt[marketcode]] and time < (getASXOpenTime() + random_time[mkt[marketcode]]) then
+			open_match_count[security] += 1
+			open_match_time[security,open_match_count[security]] = time
+			open_match_transid[security,open_match_count[security]] = transid + 0.5
+		end if
+		
+		// IF this is the close auction THEN store indicative price and volume events to insert at dayend
+		if time > continuous_end[mkt[marketcode]] and undefined close_time[security] then
+			close_match_count[security] += 1
+			close_match_time[security,close_match_count[security]] = time
+			close_match_transid[security,close_match_count[security]] = transid + 0.5
+		end if
+					
+	end if
+
+end on
+
+// Print index data
+on index
+
+	//print "[transtype] [date] [time] [index] [indexval]"
+	
+	// Index message
+	// -----------------------------------------------------------------------------------------------
+	print2csv(filename_all, 	
+			"INDEX", 
+			"[dateString] [time]", 
+			"[index]", 
+			"I", 
+			transid, 
+			price(indexval), 
+			dummyvolume, 
+			dummyvalue, 
+			dummystring)
+
+end on
+
+// Print end of day message
+at dayend
+	
+	if istrading(date) then
+		
+		per security
+			
+			if defined open_volume[security] then
+				
+				for declare let i = 1 ; i <= open_match_count[security] ; i += 1 do
+				
+					// Open match messages
+					// -----------------------------------------------------------------------------------------------
+					print2csv(filename_all, 	
+						"MATCH", 
+						"[dateString] [open_match_time[security,i]]", 
+						"[security]", 
+						"E", 
+						open_match_transid[security,i], 
+						openprice(date), 
+						open_volume[security], 
+						open_value[security], 
+						dummystring)
+				
+				end for
+			
+			end if
+		
+			if defined close_volume[security] then
+				
+				for declare let i = 1 ; i <= close_match_count[security] ; i += 1 do
+			
+					// Close match messages
+					// -----------------------------------------------------------------------------------------------
+					print2csv(filename_all, 
+						"MATCH", 
+						"[dateString] [close_match_time[security,i]]", 
+						"[security]", 
+						"E", 
+						close_match_transid[security,i], 
+						closeprice(date), 
+						close_volume[security], 
+						close_value[security], 
+						dummystring)
+				
+				end for
+			
+			end if
+			
+		end per
+		
+		// Control message
+		// -----------------------------------------------------------------------------------------------
+		print2csv(filename_all, 
+			"CONTROL", 
+			"[dateString] 23:59:59.999", 
+			dummystring, 
+			dummystring, 
+			dummynumber, 
+			dummyprice, 
+			dummyvolume, 
+			dummyvalue, 
+			"ENDOFDAY")
+		
+	end if
+			
+	free last_bid[]
+	free last_ask[]
+	free last_bidvol[]
+	free last_askvol[]
+	
+	free continuous[]
+	
+	free close_time[]
+	free close_volume[]
+	free close_value[]
+	free close_match_count[]
+	free close_match_time[]
+	free close_match_transid[]
+	
+	free open_time[]
+	free open_volume[]
+	free open_value[]
+	free open_match_count[]
+	free open_match_time[]
+	free open_match_transid[]
+
+end at

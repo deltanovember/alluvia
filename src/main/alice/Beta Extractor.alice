@@ -1,0 +1,138 @@
+/**************************************************************************************************************************************************************************************************************
+
+Beta Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	Beta Extractor.alice
+ 
+Type:		Data extraction
+
+Description:	This script extracts key data fields for the purpose of calculating stock betas relative to an index.
+
+Input(s):	None
+
+Output(s): 	This program extracts data to files in the form 'Beta Calculation [MKT] (YYYY.DD.MM).csv' where MKT is the exchange 
+		identifier and the date is the year followed by each month of the run.
+
+Author: 	Matthew Clifton (clifton.matthew@gmail.com)
+
+Date:  	28 April 2011
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#define yesterday trday(date,-1)
+
+// =======================================================================================================================================
+// 	USER PARAMS
+// =======================================================================================================================================
+
+userparams
+
+	// LSE (London Stock Exchange (no dups) (lse_mq))
+	MKT : "Name of stock market" : "LSE";
+	
+	MIN_LIQ : "Minimum number of trades today" : 20; // Mainly to cut down on number of rows
+	MIN_VAL : "Minimum value traded today" : $40000; // Mainly to cut down on number of rows
+	
+end userparams
+
+at start
+
+	// The names of any market indices
+	declare index_name[string,number] : string
+	index_name["LSE",1] = "FTSE"
+	index_name["LSE",2] = "FTLC"
+	index_name["LSE",3] = "FTMC"
+	index_name["OSE",1] = "OBX"
+	index_name["HKX",1] = "HSI"
+
+end at
+
+
+// =======================================================================================================================================
+// 	FUNCTIONS
+// =======================================================================================================================================
+
+// Date string
+function dateStr(date_ : date) : string
+	
+	//declare let d = day(date_)
+	//if d < 10 then declare let dd = "0[d]" else declare let dd = "[d]" end if
+	
+	declare let m = month(date_)
+	if m < 10 then declare let mm = "0[m]"	else declare let mm = "[m]" end if
+	
+	declare let yyyy = year(date_)
+	
+	return "[yyyy][mm]"
+	
+end dateStr
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	
+	// Declare arrays
+	declare filename : string
+	
+end at
+
+at daystart
+
+	// If new month
+	if (undefined filename or month(date) != month(yesterday)) then
+	
+		// Print output file headings
+		filename = "Beta Calculation [MKT] [dateStr(date)].csv"
+		
+		printcsv filename, 
+				"date",
+				"security",
+				"instrument", 
+				"market", 
+				"p_close_price", 
+				"close_price"
+		
+	end if
+		
+end at
+
+// =======================================================================================================================================
+// 	MAIN
+// =======================================================================================================================================
+
+at dayend
+	
+	// Print index data
+	for declare let i = 1 ; i <= 10 ; i += 1 do
+		if defined index(index(index_name[MKT,i])) then
+			printcsv filename,
+				date, 
+				index(index_name[MKT,i]), 
+				2, 
+				MKT, 
+				indexvalClose(index(index_name[MKT,i]),yesterday), 
+				indexvalClose(index(index_name[MKT,i]),date)
+		end if
+	end for
+	
+	// Print stock data		
+	per security
+		if tcount(date,date) > MIN_LIQ and value(date,date) > MIN_VAL and defined closeprice(date) and defined closeprice(yesterday) then
+			printcsv filename,
+					date,
+					security,
+					1, 
+					MKT, 
+					number(closeprice(yesterday)), 
+					number(closeprice(date))
+		end if
+	end per
+		
+end at
+

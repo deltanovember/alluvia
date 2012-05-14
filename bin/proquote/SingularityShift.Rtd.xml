@@ -1,0 +1,486 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>SingularityShift.Rtd</name>
+    </assembly>
+    <members>
+        <member name="T:SingularityShift.Rtd.IRtdUpdateEvent">
+            <summary>
+            By defining the IRtdUpdateEvent interface
+            here we do away with the need to reference
+            the "Microsoft Excel Object Library", which
+            is version specific. This makes deployment
+            of the RTD server simpler as we do not have
+            to target any one specific version of Excel
+            in this assembly.
+            Note: The GUID used here is that used by
+            Microsoft to identify this interface. You
+            must use this exact same GUID, otherwise
+            when a client uses this RTD server you will
+            get a run-time error.
+            </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdUpdateEvent.UpdateNotify">
+            <summary> Notifies the application that the RTD server has new data. </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdUpdateEvent.Disconnect">
+            <summary> Disconnects from the server. </summary>
+        </member>
+        <member name="P:SingularityShift.Rtd.IRtdUpdateEvent.HeartbeatInterval">
+            <summary> Gets or sets the heartbeat interval. </summary>
+            <value> The heartbeat interval. </value>
+        </member>
+        <member name="T:SingularityShift.Rtd.RtdServerController">
+            <summary>
+            RTD server controller. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="T:SingularityShift.Rtd.IRtdServerController">
+            <summary>
+            Interface for RTD server controller. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServerController.ConnectData(System.Int32,System.Object[]@,System.Boolean)">
+            <summary>
+            Connects to a topic on the server. 
+            </summary>
+            <param name="topicId">
+            Identifier for the topic. 
+            </param>
+            <param name="strings">
+            [in,out] The strings the topic should connect to. 
+            </param>
+            <param name="getNewValues">
+            <see langword="true"/> to get new values. 
+            </param>
+            <returns>
+            The return value from the ConnectData COM method. 
+            </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServerController.DisconnectData(System.Int32)">
+            <summary>
+            Disconnects the data described by <paramref name="topicId"/>. 
+            </summary>
+            <param name="topicId">
+            Identifier for the topic. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServerController.Heartbeat">
+            <summary>
+            Sends a heartbeat request to the RTD server. 
+            </summary>
+            <returns>
+            <see langword="true"/> if it succeeds, <see langword="false"/> if it fails. 
+            </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServerController.RefreshData(System.Int32@)">
+            <summary>
+            Refresh data. 
+            </summary>
+            <param name="topicCount">
+            [out] Number of topics. 
+            </param>
+            <returns>
+            Any new data that is available for subscribed topics. 
+            </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServerController.Start(SingularityShift.Rtd.IRtdUpdateEvent)">
+            <summary>
+            Instantiates the RTD server with the provided callback object. 
+            </summary>
+            <param name="callbackObject">
+            The callback object. 
+            </param>
+            <returns>
+            <see langword="true"/> if it succeeds, <see langword="false"/> if it fails. 
+            </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServerController.Terminate">
+            <summary>
+            Terminates the connection to the RTD server. 
+            </summary>
+        </member>
+        <member name="F:SingularityShift.Rtd.RtdServerController._rtdServer">
+            <summary> The RTD server </summary>
+        </member>
+        <member name="F:SingularityShift.Rtd.RtdServerController._rtdType">
+            <summary> Type of the RTD server </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdServerController.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SingularityShift.Rtd.RtdServerController"/> class. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="progId">
+            Identifier for the prog. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdServerController.#ctor(System.Object)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SingularityShift.Rtd.RtdServerController"/> class. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="rtdServer">
+            The RTD server. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdServerController.ConnectData(System.Int32,System.Object[]@,System.Boolean)">
+            <summary>
+            Connects to a topic on the server. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="topicId">
+            Identifier for the topic. 
+            </param>
+            <param name="strings">
+            [in,out] The strings the topic should connect to. 
+            </param>
+            <param name="getNewValues">
+            <see langword="true"/> to get new values. 
+            </param>
+            <returns>
+            The return value from the ConnectData COM method. 
+            </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdServerController.DisconnectData(System.Int32)">
+            <summary>
+            Disconnects the data described by <paramref name="topicId"/>. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="topicId">
+            Identifier for the topic. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdServerController.Heartbeat">
+            <summary>
+            Sends a heartbeat request to the RTD server. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <returns>
+            <see langword="true"/> if it succeeds, <see langword="false"/> if it fails. 
+            </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdServerController.RefreshData(System.Int32@)">
+            <summary>
+            Refresh data. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="topicCount">
+            [out] Number of topics. 
+            </param>
+            <returns>
+            Any new data that is available for subscribed topics. 
+            </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdServerController.Start(SingularityShift.Rtd.IRtdUpdateEvent)">
+            <summary>
+            Instantiates the RTD server with the provided callback object. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="callbackObject">
+            The callback object. 
+            </param>
+            <returns>
+            <see langword="true"/> if it succeeds, <see langword="false"/> if it fails. 
+            </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdServerController.Terminate">
+            <summary>
+            Terminates the connection to the RTD server. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="T:SingularityShift.Rtd.IRtdClient">
+            <summary>
+            Interface for a basic RTD client. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdClient.CheckUpdate">
+            <summary>
+            Check for updated data from the RTD server. 
+            </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdClient.DisconnectTopics">
+            <summary>
+            Disconnects the topics from the RTD server. 
+            </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdClient.ProcessData(System.Object[0:,0:])">
+            <summary>
+            Process the data described by data. 
+            </summary>
+            <param name="data">
+            The data to process. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdClient.RequestTopics(System.Boolean)">
+            <summary>
+            Connects the topics to the RTD server. 
+            </summary>
+            <param name="getNewValues">
+            <see langword="true"/> to get new values. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdClient.WaitForServer(SingularityShift.Rtd.IRtdUpdateEvent)">
+            <summary> Wait for server. </summary>
+            <param name="updateEvent"> The update event. </param>
+        </member>
+        <member name="T:SingularityShift.Rtd.RtdClient">
+            <summary>
+            RTD client. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/14/2011. 
+            </remarks>
+        </member>
+        <member name="F:SingularityShift.Rtd.RtdClient._rtdServer">
+            <summary> The RTD server reference </summary>
+        </member>
+        <member name="F:SingularityShift.Rtd.RtdClient._topics">
+            <summary> The topics </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdClient.#ctor(SingularityShift.Rtd.IRtdServerController,SingularityShift.Rtd.IRtdDataHandler,System.Collections.Generic.IDictionary{System.Int32,System.Object[]},System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SingularityShift.Rtd.RtdClient"/> class. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/14/2011. 
+            </remarks>
+            <param name="rtdServer">
+            The RTD server. 
+            </param>
+            <param name="dataHandler">
+            The handler for updated data. 
+            </param>
+            <param name="topics">
+            The topics. 
+            </param>
+            <param name="heartbeatInterval">
+            The heartbeat interval. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdClient.#ctor(SingularityShift.Rtd.IRtdServerController,SingularityShift.Rtd.IRtdUpdateEvent,System.Collections.Generic.IDictionary{System.Int32,System.Object[]})">
+            <summary>
+            Initializes a new instance of the <see cref="T:SingularityShift.Rtd.RtdClient"/> class. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/14/2011. 
+            </remarks>
+            <param name="rtdServer">
+            The RTD server. 
+            </param>
+            <param name="updateEvent">
+            The update event. 
+            </param>
+            <param name="topics">
+            The topics. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdClient.Finalize">
+            <summary>
+            Finalizes an instance of the <see cref="T:SingularityShift.Rtd.RtdClient"/> class. Cleans up RTD server connections.
+            </summary>
+            <remarks>
+            Ben McClure, 5/14/2011. 
+            </remarks>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdClient.CheckUpdate">
+            <summary>
+            Check for new data from the RTD server and calls <see cref="M:SingularityShift.Rtd.RtdClient.ProcessData(System.Object[0:,0:])"/> if there is. 
+            </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdClient.DisconnectTopics">
+            <summary>
+            Disconnects all registered topics from the RTD server. 
+            </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdClient.ProcessData(System.Object[0:,0:])">
+            <summary>
+            Process the data received from the RTD server. 
+            </summary>
+            <param name="data">
+            The data from the RTD server. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdClient.RequestTopics(System.Boolean)">
+            <summary>
+            Connects to all topics specified in the provided dictionary. 
+            </summary>
+            <param name="getNewValues">
+            <see langword="true"/> to get new values. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.RtdClient.WaitForServer(SingularityShift.Rtd.IRtdUpdateEvent)">
+            <summary>
+            Try to start server once every 2 seconds until it starts. 
+            </summary>
+            <param name="updateEvent">
+            The update event. 
+            </param>
+        </member>
+        <member name="T:SingularityShift.Rtd.DataHandlerRtdUpdateEvent">
+            <summary>
+            Data handler RTD update event. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="F:SingularityShift.Rtd.DataHandlerRtdUpdateEvent._dataHandler">
+            <summary> The data handler </summary>
+        </member>
+        <member name="F:SingularityShift.Rtd.DataHandlerRtdUpdateEvent._rtdServer">
+            <summary> The RTD server </summary>
+        </member>
+        <member name="F:SingularityShift.Rtd.DataHandlerRtdUpdateEvent._timer">
+            <summary> The heartbeat timer </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.DataHandlerRtdUpdateEvent.#ctor(SingularityShift.Rtd.IRtdDataHandler,SingularityShift.Rtd.IRtdServerController,System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SingularityShift.Rtd.DataHandlerRtdUpdateEvent"/> class. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="dataHandler">
+            The data handler. 
+            </param>
+            <param name="rtdServer">
+            The RTD server. 
+            </param>
+            <param name="heartbeatInterval">
+            The heartbeat interval. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.DataHandlerRtdUpdateEvent.Disconnect">
+            <summary>
+            Disconnects from the server. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="M:SingularityShift.Rtd.DataHandlerRtdUpdateEvent.UpdateNotify">
+            <summary>
+            Notifies the application that the RTD server has new data. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="M:SingularityShift.Rtd.DataHandlerRtdUpdateEvent.StartHeartbeatTimer(System.Int32)">
+            <summary>
+            Starts the heartbeat timer. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="heartbeatInterval">
+            The heartbeat interval. 
+            </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.DataHandlerRtdUpdateEvent.TimerElapsed(System.Object,System.Timers.ElapsedEventArgs)">
+            <summary>
+            Heartbeat timer elapsed. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+            <param name="sender">
+            Source of the event. 
+            </param>
+            <param name="eventArgs">
+            Elapsed event information. 
+            </param>
+        </member>
+        <member name="P:SingularityShift.Rtd.DataHandlerRtdUpdateEvent.HeartbeatInterval">
+            <summary> Gets or sets the heartbeat interval for getting Real-Time Data. </summary>
+            <value> The heartbeat interval. </value>
+        </member>
+        <member name="T:SingularityShift.Rtd.IRtdServer">
+            <summary>
+            By defining the IRtdServer interface
+            here we do away with the need to reference
+            the "Microsoft Excel Object Library", which
+            is version specific. This makes deployment
+            of the RTD server simpler as we do not have
+            to target any one specific version of Excel
+            in this assembly.
+            Note: The GUID used here is that used by
+            Microsoft to identify this interface. You
+            must use this exact same GUID, otherwise
+            when a client uses this RTD server you will
+            get a run-time error.
+            </summary>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServer.ServerStart(SingularityShift.Rtd.IRtdUpdateEvent)">
+            <summary> Start the RTD server. </summary>
+            <param name="callback"> The callback object. </param>
+            <returns> A positive integer if the server started successfully. </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServer.ConnectData(System.Int32,System.Object[]@,System.Boolean@)">
+            <summary> Connects to specified topics on the server. </summary>
+            <param name="topicId">  Identifier for the topic. </param>
+            <param name="strings">  The strings identifying the topic </param>
+            <param name="newValue"> [in,out] A bool indicating whether to only get new values. </param>
+            <returns> A variant. </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServer.RefreshData(System.Int32@)">
+            <summary> Refresh data from server. </summary>
+            <param name="topicCount"> [in,out] Number of topics. </param>
+            <returns> The updated data. </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServer.DisconnectData(System.Int32)">
+            <summary> Disconnects the data described by <paramref name="topicId"/>. </summary>
+            <param name="topicId"> Identifier for the topic. </param>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServer.Heartbeat">
+            <summary> Gets the heartbeat. </summary>
+            <returns> A positive integer if the server is still alive. </returns>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdServer.ServerTerminate">
+            <summary> Terminate the server. </summary>
+        </member>
+        <member name="T:SingularityShift.Rtd.IRtdDataHandler">
+            <summary>
+            Interface for RTD data handler. 
+            </summary>
+            <remarks>
+            Ben McClure, 5/16/2011. 
+            </remarks>
+        </member>
+        <member name="M:SingularityShift.Rtd.IRtdDataHandler.Handle(System.Object[0:,0:])">
+            <summary>
+            Handles RTD data. 
+            </summary>
+            <param name="rtdData">
+            Information describing the RTD data returned. 
+            </param>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,10 @@
+
+
+on quote
+	if security = ^BHP.AX then
+		print "[date] [security] [transtype] [time] [price] [volume] [bid] [ask]"
+	end if
+end on
+
+
+

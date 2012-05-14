@@ -1,0 +1,215 @@
+/**************************************************************************************************************************************************************************************************************
+
+Intraday trading activity profiling
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	profiler.alice
+ 
+Type:		Data extraction
+
+Description:	This script creates a histogram of intraday spreads, trades, volumes and values.
+
+Input(s):	config.alice
+
+Output(s): 	This program extracts data to files in the form 'Profile [MKT] YYYYMM.csv' where MKT is the exchange 
+		identifier and the YYYYMM is the year followed by each month of the run.
+		
+Author: 	Matthew Clifton (matthew.clifton@alluvialtrading.com)
+
+Date:  	18 August 2011
+
+Version: 	1.0
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#include "config.alice"
+
+userparams
+	
+	INTERVAL : "Size of each time interval" : 30 minutes;
+	//OPEN_TIME : "Open time" : 08:00:30;
+	//CLOSE_TIME : "Close time" : 16:45:00;
+	OPEN_TIME : "Open time" : 10:10:00;
+	CLOSE_TIME : "Close time" : 16:15:00;
+	N_GROUP : "Number of stock groups" : 10;
+
+end userparams
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	
+	// Declare arrays
+	declare let t = 0
+
+	declare last_bid[security] : price
+	declare last_ask[security] : price
+
+	declare time_[security,number] : time
+	declare spread_[security,number] : number
+	declare tcount_[security,number] : number
+	declare value_[security,number] : value
+	
+	declare value_dist : distribution
+	declare cutoff[number] : number
+
+	// Print output file headings
+	declare let filename = "Profile [mkt[marketcode]] [dateStrFile()].csv"
+	declare let header = ""
+
+end at
+
+on quote
+	if time >= open_auction_end[marketcode] and time <= continuous_end[marketcode] then
+		last_bid[security] = bid
+		last_ask[security] = ask
+	end if
+end on
+
+at OPEN_TIME
+				
+	t = 1
+	
+	per security
+		
+		if tcount(date,date) > 0 then
+			
+			time_[security,t] = OPEN_TIME
+			spread_[security,t] = 2 * 100 * (ask - bid) / (bid + ask)
+			tcount_[security,t] = tcount(open_auction_start[marketcode])
+			value_[security,t] = value(open_auction_start[marketcode])
+					
+		end if
+	
+	end per
+
+end at
+
+every INTERVAL
+	
+	// Continuous trading
+	if time >= open_auction_end[marketcode] + random_time[marketcode] and time <= continuous_end[marketcode] then
+		
+		t += 1
+		
+		per security
+			
+			if tcount(date,date) > 0 then
+			
+				time_[security,t] = time
+				spread_[security,t] = 2 * 100 * (last_ask[security] - last_bid[security]) / (last_bid[security] + last_ask[security])
+				tcount_[security,t] = tcount(time-INTERVAL)
+				value_[security,t] = value(time-INTERVAL)
+				
+			end if
+		
+		end per
+	
+	end if
+
+end every
+
+at CLOSE_TIME
+	
+	t += 1
+	
+	per security
+		
+		if tcount(date,date) > 0 then
+				
+			time_[security,t] = CLOSE_TIME
+			spread_[security,t] = 2 * 100 * (last_ask[security] - last_bid[security]) / (last_bid[security] + last_ask[security])
+			tcount_[security,t] = tcount(continuous_end[marketcode] )
+			value_[security,t] = value(continuous_end[marketcode] )
+				
+		end if
+	
+	end per
+	
+end at
+
+
+at dayend
+	
+	
+	per security
+		
+		if tcount(date,date) > 0 then
+			value_dist <- value(date,date)
+		end if
+			
+	end per
+	
+	declare let c = percent(1/N_GROUP)
+
+	for declare let i = 1 ; i <= N_GROUP-1 ; i += 1 do
+		cutoff[i] = distcutoff(value_dist,100%-i*c)
+		//print "[i] [cutoff[i]]"
+	end for
+		
+	if header = "" then
+		
+		for declare let n = 1 ; n <= t ; n += 1 do
+			header = "[header];time[n];spread[n];tcount[n];value[n]"
+		end for
+		
+		printcsv filename,
+			"date", 
+			"security", 
+			"group[header]"
+		
+	end if
+	
+	per security
+		
+		if tcount(date,date) > 0 then
+	
+			declare let data = ""
+			declare let data_okay = true
+			
+			for declare let n = 1 ; n <= t ; n += 1 do
+				data = "[data];[time_[security,n]];[spread_[security,n]];[number(tcount_[security,n])];[number(value_[security,n])]"
+				if undefined time_[security,n] or undefined spread_[security,n] or undefined tcount_[security,n] or undefined value_[security,n] then
+					data_okay = false
+				end if
+				if spread_[security,n] <= 0 or spread_[security,n] > 20 then
+					data_okay = false
+				end if
+			end for
+			
+			declare let group = N_GROUP
+			for declare let i = 1 ; i <= N_GROUP-1 ; i += 1 do
+				if group = N_GROUP and number(value(date,date)) >= cutoff[i] then
+					group = i
+				end if
+				//print "[security] [group] [value(date,date)] [cutoff[i]] [i]"
+			end for
+			
+			if data_okay then
+				printcsv filename,
+					date, 
+					security, 
+					"[group][data]"
+			end if
+				
+		end if
+	
+	end per
+
+	free last_bid[]
+	free last_ask[]
+	free time_[]
+	free spread_[]
+	free tcount_[]
+	free value_[]
+	free value_dist[]
+	free cutoff[]
+	
+end at
+
+

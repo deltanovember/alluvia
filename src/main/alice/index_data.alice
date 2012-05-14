@@ -1,0 +1,96 @@
+/**************************************************************************************************************************************************************************************************************
+
+Beta Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	Beta Extractor.alice
+ 
+Type:		Data extraction
+
+Description:	This script extracts key data fields for the purpose of calculating stock betas relative to an index.
+
+Input(s):	None
+
+Output(s): 	This program extracts data to files in the form 'Beta Calculation [MKT] (YYYY.DD.MM).csv' where MKT is the exchange 
+		identifier and the date is the year followed by each month of the run.
+
+Author: 	Matthew Clifton (clifton.matthew@gmail.com)
+
+Date:  	28 April 2011
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#define yesterday trday(date,-1)
+
+// =======================================================================================================================================
+// 	USER PARAMS
+// =======================================================================================================================================
+
+userparams
+
+	// LSE (London Stock Exchange (no dups) (lse_mq))
+	MKT : "Name of stock market" : "LSE";
+	
+end userparams
+
+at start
+
+	// The names of any market indices
+	declare index_name[string,number] : string
+	index_name["LSE",1] = "FTSE"
+	index_name["LSE",2] = "FTLC"
+	index_name["LSE",3] = "FTMC"
+	index_name["OSE",1] = "OBX"
+	index_name["HKX",1] = "HSI"
+	index_name["ASX",1] = "AORD"
+
+end at
+
+on quote
+	
+	printcsv filename, 
+			"date",
+			"security",
+			"instrument", 
+			"market", 
+			"p_close_price", 
+			"close_price"
+		
+end at
+
+// =======================================================================================================================================
+// 	MAIN
+// =======================================================================================================================================
+
+at dayend
+	
+	// Print index data
+	for declare let i = 1 ; i <= 10 ; i += 1 do
+		if defined index(index(index_name[MKT,i])) then
+			printcsv filename,
+				date, 
+				index(index_name[MKT,i]), 
+				2, 
+				MKT, 
+				indexvalClose(index(index_name[MKT,i]),yesterday), 
+				indexvalClose(index(index_name[MKT,i]),date)
+		end if
+	end for
+	
+	// Print stock data		
+	per security
+		if tcount(date,date) > MIN_LIQ and value(date,date) > MIN_VAL and defined closeprice(date) and defined closeprice(yesterday) then
+			printcsv filename,
+					date,
+					security,
+					1, 
+					MKT, 
+					number(closeprice(yesterday)), 
+					number(closeprice(date))
+		end if
+	end per
+		
+end at
+

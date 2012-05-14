@@ -1,0 +1,12 @@
+
+//on mkttrade, entord, amdord, delord
+on mkttrade
+	if security = ^CBA then
+		if time > 10:11:00 and time < 16:12:00 then
+			print "[date] [time] [security] [transtype] [price] [volume] [bid] [ask]"
+		end if
+	end if
+end on
+
+
+

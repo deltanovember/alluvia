@@ -1,0 +1,41 @@
+
+at start
+	
+	per security
+		
+		declare let rand_ = rand(10,20)
+		print "[rand_] [rand_ minutes]"
+		
+	end per
+	
+end at
+
+
+
+//userparams
+//
+//	N_EVENTS : "The number of events each before and after a liquidity shock" : 50;
+//	DEBUG_MODE : "Specify a security to debug" : false;
+//	DEBUG_SECURITY : "Specify a security to debug" : ^AAL.L;
+//
+//end userparams
+//
+//at start
+//
+//
+//	// Print output file headings
+//	declare let filename = "test.csv"
+//
+//	// Headers
+//	declare let header = ""
+//	for declare let k = 1 ; k <= N_EVENTS ; k += 1 do
+//		header = "[header];transtype[k];time[k];bid[k];ask[k]"
+//	end for
+//	for declare let k = N_EVENTS+1 ; k <= 2*N_EVENTS ; k += 1 do
+//		header = "[header];bid[k];ask[k]"
+//	end for
+//	printcsv filename,
+//	    "security;p_tcount;p_value;trade_vwap;trade_volume;initiator[header]"
+//
+//
+//end at

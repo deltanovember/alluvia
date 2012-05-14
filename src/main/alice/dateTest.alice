@@ -1,0 +1,35 @@
+
+
+at start
+	declare let count = 0
+	declare let lim = 50
+	declare last_bid[security] : price
+	declare last_ask[security] : price
+	declare last_bidvol[security] : volume
+	declare last_askvol[security] : volume
+end at
+
+on quote
+	last_bid[security] = bid
+	last_ask[security] = ask
+	last_bidvol[security] = quotevolbid
+	last_askvol[security] = quotevolask
+end on
+
+on mkttrade
+	if time > 10:35:00 and time < 10:45:00 then
+		if (price <= bid and volume > last_bidvol[security] and volume > last_askvol[security]) or (price >= ask and volume > last_bidvol[security] and volume > last_askvol[security]) then
+			count += 1
+			if count <= lim then 	
+				print "[date] [time] [transtype] [security] [price] [volume] [bid] [ask] [last_bidvol[security]] [last_askvol[security]]"
+			end if
+		end if
+	end if
+end on
+
+
+
+
+
+
+

@@ -1,0 +1,242 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>Spread View</title>
+
+		<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
+		<script type="text/javascript">
+
+        seriesCounter = 0;
+        var trades  = getCsv('trades.csv');
+        var spreads = getCsv('spreads.csv');
+        var bids = getCsv('bids.csv');
+        var asks = getCsv('asks.csv');
+        var volumes = [];
+
+        function roundNumber(num, dec) {
+	        var result = Math.round(num*Math.pow(10,dec))/Math.pow(10,dec);
+	        return result;
+        }
+            
+        function getCsv(file_name){
+            var array_holder = [];
+           
+            var jqxhr = $.get(file_name, function(csv, state, xhr) {
+
+                // inconsistency
+                if (typeof csv != 'string') {
+                    csv = xhr.responseText;
+                }
+
+                // parse the CSV trades
+                var header, comment = /^#/, x;
+
+                $.each(csv.split('\n'), function(i, line){
+                    if (!comment.test(line)) {
+                        if (false) {
+                            header = line;
+                        }
+                        else if (line.length > 5) {
+                            var point = line.split(','),
+                                date = point[0].split('-'),
+                                time = point[1].split(':');
+
+                            var seconds = time[2].split('.')[0];
+                            var millis =  time[2].split('.')[1];
+  //alert(seconds);
+                            if (point.length > 1) {
+                                x = Date.UTC(date[0], date[1] - 1, date[2], time[0], time[1], seconds, millis);
+
+                                array_holder.push([
+                                    x, // time
+                                    roundNumber(parseFloat(point[3]), 2) // close
+                                ]);
+                            if (file_name == 'trades.csv') {
+                                volumes.push([x, parseFloat(point[2])]);
+                            }
+                            }
+                        }
+                    }
+
+                }); // each
+
+            })
+
+            .success(
+
+                function() {
+                
+                    seriesCounter++;
+                    if (seriesCounter >= 4) {
+                        //alert(seriesCounter);
+                        $(createChart);
+                    }
+                }
+            );
+
+            return array_holder;
+        }
+ 
+
+        
+        function createChart() {
+
+            // Create the chart
+            window.chart = new Highcharts.StockChart({
+                chart: {
+                    renderTo: 'container',
+                    zoomType: 'xy'
+                }, // chart
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: [true, true],
+                    formatter: function() {
+
+                        var s = Highcharts.dateFormat('%A, %b %e, %Y', this.x);
+
+                        $.each(this.points, function(i, point) {
+                            if (this.series.name == 'Trade') {
+                                //s = Highcharts.dateFormat('%A, %b %e, %Y', this.x);
+                                s += '<br/>' + this.series.name + ' @ $'+ roundNumber(point.y, 2);
+                                //return false;
+                            }
+                            else {
+                                if (this.series.name == 'Bid') {
+                                   // s += '<br/>' + this.series.name + ' = $'+ roundNumber(point.y, 2);
+                                    //return false;
+                                }
+                                if (this.series.name == 'Spread') {
+                                   // s += '<br/>' + 'Ask' + ' = $'+ roundNumber(point.y, 2);
+
+                                 }
+                            }
+
+                        });
+
+                        return s;
+                    }
+                },
+        /**
+                rangeSelector: {
+		    	buttons: [{
+					type: 'minute',
+					count: 15,
+					text: '15m'
+				}, {
+					type: 'hour',
+					count: 1,
+					text: '1h'
+				}, {
+					type: 'all',
+					count: 1,
+					text: 'All'
+				}],
+				selected: 2,
+				inputEnabled: false
+		         },*/
+                legend: {
+                    enabled: true,
+                    align: 'right',
+                    labelFormatter: function() {
+                       return this.name;
+                       // return this.name
+                    },
+                    layout: 'vertical',
+                    verticalAlign: 'middle'
+                },
+                title: {
+                    text: 'GLEN.L Spread'
+                },
+
+                xAxis: {
+                    endOnTick: true,
+                    maxZoom: 100,
+                   // max: 15:00,
+                    startOnTick: true
+
+                }, 
+                yAxis: {
+                   max: 14.75,
+                    min: 14.20,
+                    startOnTick: false,
+                    //tickInterval: 0.0001,
+                    title: {
+                        text: 'Price'
+                    }
+                },
+                series: [{
+                    name: 'Ask',
+                            // ASKBEGIN
+                            data: asks,
+                            color: '#CC0066',
+                            // ASKEND
+                            fillColor: '#CC0066',
+                            lineWidth: 0,
+                            step: true,
+                            type: 'area',
+                            threshold: null
+                        }, {
+                    name: 'Spread',
+                            // SPREADBEGIN
+                            data: spreads,
+                            // SPREADEND
+                            fillColor: '#000000',
+                            lineWidth: 0,
+                            step: true,
+                            showInLegend: false,
+                            type: 'area',
+                            threshold: null
+                        },
+                       {
+                            name: 'Bid',
+                            // BIDBEGIN
+                            data: bids,
+                            // BIDEND
+                            color: '#0099FF',
+                            fillColor: '#0099FF',
+                            lineWidth: 0,
+                            step: true,
+                            type: 'area',
+                            threshold: null
+                        },
+                        {
+                            name: 'Trade',
+                            // TRADEBEGIN
+                            data: trades,
+                        // TRADEEND
+                            lineWidth: 0,
+                        marker: {
+                            enabled: true,
+                            color: '#FFCC00',
+                            fillColor: '#FFCC00',
+                            radius: 4,
+                            symbol: 'diamond'
+                        } // marker
+                    },
+                 {
+                    type: 'column',
+                    name: 'Volume',
+                    data: volumes,
+                    showInLegend: false,
+                    yAxis: 1
+                }
+                ] // series
+			}
+        );
+
+
+		} // function createChart
+		</script>
+
+	</head>
+	<body>
+
+		<script type="text/javascript" src="../../js/highstock.js"></script>
+
+
+		<div id="container" style="height: 600px"></div>
+	</body>
+</html>

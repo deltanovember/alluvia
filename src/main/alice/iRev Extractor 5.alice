@@ -1,0 +1,276 @@
+/**************************************************************************************************************************************************************************************************************
+
+iRev Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	iRev Extractor.alice
+ 
+Type:		Pattern recognition and data extraction
+
+Description:	This script extracts key data fields for the purpose of identifying abnormal intraday price movements.
+
+Input(s):	Trade and Quote market data
+
+Output(s): 	This program extracts data to files in the form 'LIQREP [MKT] YYYYMM.csv' where MKT is the exchange 
+		identifier and the YYYYMM is the year followed by each month of the run.
+		
+Author: 	Matthew Clifton (matthew.clifton@alluvialtrading.com)
+
+Date:  	5 October 2011
+
+Version: 	2.0
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#include "config.alice"
+
+#define DATA_ERROR (price >= 50 * closeprice(date) or price <= closeprice(date) / 50)
+#define ACTIVE_STOCK (tcount(yesterday,yesterday) > 10 and value(yesterday,yesterday) > $50000)
+#define CONTINUOUS_TRADING (time > open_auction_end[marketcode] and time < continuous_end[marketcode])
+#define BLIM ((defined bidafter and defined askafter and defined BidVolAtStep(0) and defined AskVolAtStep(0)) and (bidafter != bidbefore or askafter != askbefore or last_bidvol[security] != BidVolAtStep(0) or  last_askvol[security] != AskVolAtStep(0)))
+//#define BLIM ((defined bidafter and defined askafter) and (bidafter != bidbefore or askafter != askbefore))
+#define LIQUIDITY_SHOCK_ (defined bidbefore and defined askbefore and defined bidafter and defined askafter and spread_after > spread_before)
+#define SPREAD_CHECK (ask < bid)
+
+userparams
+	
+	N_EVENTS : "Half of the number of of events after liquidity shock" : 10;
+	DEGUG : "Debug or run mode" : true;
+	DEGUG_SECURITY : "Debug security" : ^NAB;
+
+end userparams
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	
+	// Declare arrays
+	declare last_bidvol[security] : volume
+	declare last_askvol[security] : volume
+	
+	declare bid_after[security] : price
+	declare ask_after[security] : price
+	declare bidvol_after[security] : volume
+	declare askvol_after[security] : volume
+					
+	declare trade_time[security] : time
+	declare trade_price_volume[security] : value
+	declare trade_volume[security] : volume
+	
+	declare liquidity_shock[security] : boolean
+	
+	declare time_blim_before[security,number] : time
+	declare bid_blim_before[security,number] : price
+	declare ask_blim_before[security,number] : price
+	declare bidvol_blim_before[security,number] : volume
+	declare askvol_blim_before[security,number] : volume
+	
+	declare blim_after[security] : number
+	declare time_blim_after[security,number] : time
+	declare bid_blim_after[security,number] : price
+	declare ask_blim_after[security,number] : price
+	declare bidvol_blim_after[security,number] : volume
+	declare askvol_blim_after[security,number] : volume
+	
+	declare erroneous_data[security] : zeroed boolean
+
+	// Print output file headings
+	declare let filename = "iRev [mkt[marketcode]] [dateStrFile()].csv"
+	
+	declare let headers1 = ""
+	declare let headers2 = ""
+	declare let headers3 = ""
+	for declare let i = 1 ; i <= N_EVENTS ; i += 1 do
+		headers1 = "[headers1];timeBefore[i];bidBefore[i];askBefore[i];bidVolBefore[i];askVolBefore[i]"
+	end for
+	for declare let i = 1 ; i <= N_EVENTS ; i += 1 do
+		headers2 = "[headers2];timeAfter[i];bidAfter[i];askAfter[i];bidVolAfter[i];askVolAfter[i]"
+	end for
+	for declare let i = N_EVENTS+1 ; i <= 2*N_EVENTS ; i += 1 do
+		headers3 = "[headers3];timeAfter[i];bidAfter[i];askAfter[i];bidVolAfter[i];askVolAfter[i]"
+	end for
+	
+	printcsv filename, 
+		"date", 
+		"security", 
+		"p_tcount", 
+		"p_value", 
+		headers1, 
+		"time", 
+		"trade_vwap", 
+		"trade_volume", 
+		"bid_after", 
+		"ask_after", 
+		"bidvol_after", 
+		"askvol_after",
+		headers2,
+		headers3 
+
+end at
+
+before mkttrade, entord, amdord, delord
+	if ACTIVE_STOCK and CONTINUOUS_TRADING then
+		last_bidvol[security] = BidVolAtStep(0)
+		last_askvol[security] = AskVolAtStep(0)
+	end if
+end before
+
+// On trade
+after mkttrade
+	
+	if ACTIVE_STOCK and CONTINUOUS_TRADING then
+	
+		// Check for erroneous data
+		if DATA_ERROR then
+			erroneous_data[security] = true
+		else
+			
+			// Unique trade event (consolidate trades with the same timestamp)
+			if undefined trade_time[security] or time != trade_time[security] then
+				trade_time[security] = dummytime
+				trade_price_volume[security] = dummyvalue
+				trade_volume[security] = dummyvolume
+				liquidity_shock[security] = false
+			end if
+			
+			// Trade details
+			trade_time[security] = time
+			trade_price_volume[security] += price * volume
+			trade_volume[security] += volume
+			
+			// Limit order book after	
+			bid_after[security] = bidafter
+			ask_after[security] = askafter
+			bidvol_after[security] = BidVolAtStep(0)
+			askvol_after[security] = AskVolAtStep(0)
+		
+			// Test if trade causes a liquidity shock
+			declare let spread_before = 200 * (askbefore - bidbefore) / (bidbefore + askbefore)
+			declare let spread_after = 200 * (askafter - bidafter) / (bidafter + askafter)
+			if liquidity_shock[security] or LIQUIDITY_SHOCK_ then
+				// This is a liquidity shock
+				liquidity_shock[security] = true
+				// Reset blim_after counter
+				blim_after[security] = 0
+			end if
+			
+		end if
+	
+	end if
+	
+end after
+
+// BLim updates before liquidity shock
+after entord, amdord, delord
+	
+	if ACTIVE_STOCK and CONTINUOUS_TRADING and BLIM then
+		
+		if not(liquidity_shock[security]) then
+			
+			// Store Blim updates before liquidity shock
+			for declare let k = 1 ; k <= N_EVENTS-1 ; k += 1 do
+				time_blim_before[security,k] = time_blim_before[security,k+1]
+				bid_blim_before[security,k] = bid_blim_before[security,k+1]
+				ask_blim_before[security,k] = ask_blim_before[security,k+1]
+				bidvol_blim_before[security,k] = bidvol_blim_before[security,k+1]
+				askvol_blim_before[security,k] = askvol_blim_before[security,k+1]
+			end for
+			time_blim_before[security,N_EVENTS] = time
+			bid_blim_before[security,N_EVENTS] = bidafter
+			ask_blim_before[security,N_EVENTS] = askafter
+			bidvol_blim_before[security,N_EVENTS] = BidVolAtStep(0)
+			askvol_blim_before[security,N_EVENTS] = AskVolAtStep(0)
+		
+		else
+		
+			// Store events after liquidity shock
+			if blim_after[security] <= 2*N_EVENTS then
+				blim_after[security] += 1
+				time_blim_after[security,blim_after[security]] = time
+				bid_blim_after[security,blim_after[security]] = bidafter
+				ask_blim_after[security,blim_after[security]] = askafter
+				bidvol_blim_after[security,blim_after[security]] = BidVolAtStep(0)
+				askvol_blim_after[security,blim_after[security]] = AskVolAtStep(0)	
+			end if
+			
+		end if
+		
+		if blim_after[security] = 2*N_EVENTS and defined time_blim_before[security,1] then
+
+			// Print liquidity shock data
+			declare let trade_vwap = trade_price_volume[security] / trade_volume[security]
+			declare let data1 = ""
+			declare let data2 = ""
+			declare let data3 = ""
+			for declare let n = 1 ; n <= N_EVENTS ; n += 1 do
+				data1 = "[data1];[time_blim_before[security,n]];[number(bid_blim_before[security,n])];[number(ask_blim_before[security,n])];[number(bidvol_blim_before[security,n])];[number(askvol_blim_before[security,n])]"
+			end for
+			for declare let n = 1 ; n <= N_EVENTS ; n += 1 do
+				data2 = "[data2];[time_blim_after[security,n]];[number(bid_blim_after[security,n])];[number(ask_blim_after[security,n])];[number(bidvol_blim_after[security,n])];[number(askvol_blim_after[security,n])]"
+			end for
+			for declare let n = N_EVENTS+1 ; n <= 2*N_EVENTS ; n += 1 do
+				data3 = "[data3];[time_blim_after[security,n]];[number(bid_blim_after[security,n])];[number(ask_blim_after[security,n])];[number(bidvol_blim_after[security,n])];[number(askvol_blim_after[security,n])]"
+			end for
+
+			if strlen("[security]") < 4 then
+				
+				if DEGUG and security = DEGUG_SECURITY then
+					print "[date] [time] [security] [transtype] 
+						[time_blim_before[security,1]] [time_blim_before[security,2]] [time_blim_before[security,3]] 
+						- [trade_time[security]] - 
+						[time_blim_after[security,1]] [time_blim_after[security,2]] [time_blim_after[security,3]] [time_blim_after[security,4]] [time_blim_after[security,5]] [time_blim_after[security,6]]"
+				end if
+				
+				printcsv filename, 	
+					date, 
+					security, 
+					tcount(yesterday), 
+					value(yesterday), 
+					data1, 
+					trade_time[security], 
+					number(trade_vwap), 
+					trade_volume[security], 
+					number(bid_after[security]), 
+					number(ask_after[security]), 
+					bidvol_after[security], 
+					askvol_after[security], 
+					data2, 
+					data3
+
+			end if
+
+			// Reset blim_after counter
+			blim_after[security] = 0
+
+			// Free arrays
+			for declare let k = 1 ; k <= N_EVENTS ; k += 1 do
+				time_blim_before[security,k] = dummytime
+				bid_blim_before[security,k] = dummyprice
+				ask_blim_before[security,k] = dummyprice
+				bidvol_blim_before[security,k] = dummyvolume
+				askvol_blim_before[security,k] = dummyvolume
+			end for
+			for declare let k = 1 ; k <= 2*N_EVENTS ; k += 1 do
+				time_blim_after[security,k] = dummytime
+				bid_blim_after[security,k] = dummyprice
+				ask_blim_after[security,k] = dummyprice
+				bidvol_blim_after[security,k] = dummyvolume
+				askvol_blim_after[security,k] = dummyvolume
+			end for
+			
+		end if
+	
+	end if
+	
+end after
+
+at dayend
+	
+	free erroneous_data[]
+	
+end at

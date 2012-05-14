@@ -1,0 +1,439 @@
+/**************************************************************************************************************************************************************************************************************
+
+iRev Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	iRev Extractor.alice
+ 
+Type:		Data extraction
+
+Description:	This script extracts key data fields for the purpose of identifying abnormal intraday price movements.
+
+Input(s):	None
+
+Output(s): 	This program extracts data to files in the form 'iRev [MKT] YYYYDD.csv' where MKT is the exchange 
+		identifier and the YYYYMMis the year followed by each month of the run.
+		
+Author: 	Matthew Clifton (clifton.matthew@gmail.com)
+
+Date:  	20 May 2011
+
+Version: 	1.8
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#define yesterday trday(date,-1)
+
+userparams
+	
+	COM_TIME : "Estimated 2-way data delay" : 4 seconds;				// Note: May not be accurate if time is less than 1 minute, though seems to have sub-second granualrity
+	OUT_TIME : "Minimum time to steer clear of opens and closes" : 6 minutes;
+	REF_TIME : "Timespan over which to calculate reference data" : 1 minutes; 	// Note: May not be accurate if time is less than 1 minute
+	GAP_TIME : "Minimum time between new signals" : 5 seconds;
+	HOLD_TIME_1 : "Minimum time to hold position" : 5 minutes;
+	HOLD_TIME_2 : "Minimum time to hold position" : 15 minutes;
+	HOLD_TIME_3 : "Minimum time to hold position" : 30 minutes;
+	PRINT_DAILY : "Print data to daily or monthly files" : false;
+	
+	MIN_PCH : "Minimum price change (bps)" : 20;
+	MIN_PCH_REL : "Minimum price change relative to the spread (x)" : 1.5;
+	MIN_LIQ : "Minimum number of trades": 10;
+
+//	// ASX (asx_mq)
+//	MKT : "Name of stock market" : "ASX";
+//	OPEN_TIME_1 : "End of open auction" : 10:10:00;
+//	CLOSE_TIME_1 : "End of continuous trading" : 16:00:00;
+//	OPEN_TIME_2 : "End of close auction" : 00:00:00;
+//	CLOSE_TIME_2 : "End of close auction" : 00:00:00;
+// 	SCALE : "Currency scale" : 1;
+
+//	// HKX (hkx_mq)
+//	MKT : "Name of stock market" : "HKX";
+//	OPEN_TIME_1 : "End of open auction" : 10:00:00;
+//	CLOSE_TIME_1 : "End of continuous trading" : 12:30:00;
+//	OPEN_TIME_2 : "End of close auction" : 14:30:00;
+//	CLOSE_TIME_2 : "End of close auction" : 16:00:00;
+// 	SCALE : "Currency scale" : 8.3;
+
+	// EURONEXT (paris_mq)
+	MKT : "Name of stock market" : "EUR";
+	OPEN_TIME_1 : "End of open auction" : 09:00:00;
+	CLOSE_TIME_1 : "End of continuous trading" : 17:25:00;
+	OPEN_TIME_2 : "End of close auction" : 00:00:00;
+	CLOSE_TIME_2 : "End of close auction" : 00:00:00;
+ 	SCALE : "Currency scale" : 1.3;
+
+//	// SGX (sgx_mq)
+//	MKT : "Name of stock market" : "SGX";
+//	OPEN_TIME_1 : "End of open auction" : 09:00:00;
+//	CLOSE_TIME_1 : "End of continuous trading" : 12:30:00;
+//	OPEN_TIME_2 : "End of close auction" : 14:00:00;
+//	CLOSE_TIME_2 : "End of close auction" : 17:00:00;
+// 	SCALE : "Currency scale" : 1.3;
+
+//	// TSE (tse_mq)
+//	MKT : "Name of stock market" : "TSE";
+//	OPEN_TIME_1 : "End of open auction" : 09:00:00;
+//	CLOSE_TIME_1 : "End of continuous trading" : 11:00:00;
+//	OPEN_TIME_2 : "End of close auction" : 12:30:00;
+//	CLOSE_TIME_2 : "End of close auction" : 15:00:00;
+// 	SCALE : "Currency scale" : 86;
+	
+
+end userparams
+
+at start
+
+	// The names of any market indices
+	declare index_name[string,number] : string
+	index_name["LSE",1] = "FTSE"
+	index_name["LSE",2] = "FTLC"
+	index_name["LSE",3] = "FTMC"
+	index_name["OSE",1] = "OBX"
+	index_name["HKX",1] = "HSI"
+	index_name["ASX",1] = "AORD"
+
+end at
+
+// =======================================================================================================================================
+// 	FUNCTIONS
+// =======================================================================================================================================
+
+// Date string
+function dateStr(date_ : date) : string
+	
+	declare let d = day(date_)
+	if d < 10 then declare let dd = "0[d]" else declare let dd = "[d]" end if
+	
+	declare let m = month(date_)
+	if m < 10 then declare let mm = "0[m]"	else declare let mm = "[m]" end if
+	
+	declare let yyyy = year(date_)
+	
+	return "[yyyy][mm][dd]"
+	
+end dateStr
+
+
+// =======================================================================================================================================
+// 	INIT
+// =======================================================================================================================================
+
+at start
+	
+	// Declare arrays
+	declare filename : string
+	declare bidvol_[security] : volume
+	declare askvol_[security] : volume
+	declare high_[security] : price
+	declare low_[security] : price
+	declare spread_dist[security] : distribution
+	declare spread_count[security] : zeroed number
+	declare id[security] : number
+	
+	declare time_[security,number] : time
+	declare high[security,number] : price
+	declare low[security,number] : price
+	declare bid_[security,number] : price
+	declare ask_[security,number] : price
+	declare bidvol[security,number] : volume
+	declare askvol[security,number] : volume
+	
+	declare last_bid[security] : zeroed price
+	declare last_ask[security] : zeroed price
+
+	declare bidvol_future_1[security,number] : volume
+	declare askvol_future_1[security,number] : volume
+	declare bidvol_future_2[security,number] : volume
+	declare askvol_future_2[security,number] : volume
+	declare bidvol_future_3[security,number] : volume
+	declare askvol_future_3[security,number] : volume
+		
+	declare ref_price[security,number] : price
+	declare ref_spread[security,number] : zeroed number
+	declare ref_volume[security,number] : volume
+	declare ref_tcount[security,number] : number
+	
+	declare erroneous_data[security] : zeroed boolean
+
+end at
+
+at daystart
+	
+	if (PRINT_DAILY and istrading(date)) or (not(PRINT_DAILY) and (undefined filename or month(date) != month(yesterday))) then
+
+		declare let date_str = dateStr(date)
+		if not(PRINT_DAILY) then
+			date_str = substr(date_str,1,6)
+		end if
+
+		// Print output file headings
+		filename = "iRev [MKT] [date_str].csv"
+			
+		printcsv filename, 
+			"date", 
+			"security", 
+			"instrument", 
+			"market", 
+			"event_id", 
+			"event_time", 
+			"high_price", 
+			"low_price", 
+			"ref_price", 
+			"ref_spread", 
+			"ref_volume", 
+			"ref_tcount", 
+			"bid", 
+			"ask", 
+			"bid_delayed", 
+			"ask_delayed", 
+			"bidvol", 
+			"askvol", 
+			"bid_[minute(HOLD_TIME_1)]", 
+			"ask_[minute(HOLD_TIME_1)]", 
+			"bid_[minute(HOLD_TIME_2)]", 
+			"ask_[minute(HOLD_TIME_2)]", 
+			"bid_[minute(HOLD_TIME_3)]", 
+			"ask_[minute(HOLD_TIME_3)]", 
+			"bidvol_[minute(HOLD_TIME_1)]", 
+			"askvol_[minute(HOLD_TIME_1)]", 
+			"bidvol_[minute(HOLD_TIME_2)]", 
+			"askvol_[minute(HOLD_TIME_2)]", 
+			"bidvol_[minute(HOLD_TIME_3)]", 
+			"askvol_[minute(HOLD_TIME_3)]"
+			
+	end if
+	
+end at
+
+// Erroneous data check
+on mkttrade
+	if price >= 50 * closeprice(date) or price <= closeprice(date) / 50 then
+		erroneous_data[security] = true
+	end if	
+end on
+
+// Get last quote volumes
+on quote
+	
+	if not(erroneous_data[security]) then
+		
+		if (time >= OPEN_TIME_1 + OUT_TIME and time <= CLOSE_TIME_1 - OUT_TIME) or (time >= OPEN_TIME_2 + OUT_TIME and time <= CLOSE_TIME_2 - OUT_TIME) then
+			bidvol_[security] = quotevolbid
+			askvol_[security] = quotevolask
+		end if
+		
+	end if
+	
+end on
+
+// After trades
+after trade
+	
+	if not(erroneous_data[security]) then
+		
+		// Calculate running daily high and low (Note: Ref GMG or AWC.AX on 28/6/2010)
+		if undefined high_[security] or price > high_[security] then
+			high_[security] = price
+		end if
+		if undefined low_[security] or price < low_[security] then
+			low_[security] = price
+		end if
+	
+	end if
+
+end after
+
+// After quote get event data
+after quote
+	
+	if not(erroneous_data[security]) and bid < ask then
+	
+		if (time >= OPEN_TIME_1 + OUT_TIME and time <= CLOSE_TIME_1 - OUT_TIME) or (time >= OPEN_TIME_2 + OUT_TIME and time <= CLOSE_TIME_2 - OUT_TIME) then
+	
+			declare let current_spread = 2 * 100 * 100 * (ask - bid) / (ask + bid)
+			//print "[date] [security] [time] [ask] [bid] [current_spread]"
+	
+			// Check for intraday auctions
+			if current_spread > 0 then
+				
+				// Get event data
+				// ----------------------------------------------------------------------------------------------------------------
+				
+				// Ref spread
+				spread_dist[security] <- current_spread
+				spread_count[security] += 1
+			
+				if spread_count[security] >= MIN_LIQ then
+
+					declare let ref_price_ = vwap(time-REF_TIME)
+					declare let ref_spread_ = distaverage(spread_dist[security])
+		
+					declare let bid_pchange_ = 100 * 100 * (bid - ref_price_) / ref_price_
+					declare let ask_pchange_ = 100 * 100 * (ask - ref_price_) / ref_price_
+					
+					if (last_bid[security] != bid and bid_pchange_ >= MIN_PCH and bid_pchange_ >= MIN_PCH_REL*ref_spread_) or
+						(last_ask[security] != ask and abs(ask_pchange_) >= MIN_PCH and ask_pchange_ <= -MIN_PCH_REL*ref_spread_) then
+		
+	//				if security = ^STO.AX then
+	//					print "[date] [time] [security] [transtype] [price] [bid] [ask] [ref_price_] [ref_spread_] [bid_pchange_] [ask_pchange_]"
+	//				end if
+		
+						if undefined id[security] or time >= time_[security,id[security]] + GAP_TIME then
+							
+							id[security] += 1
+							
+							// Event details
+							time_[security,id[security]] = time
+							high[security,id[security]] = high_[security]
+							low[security,id[security]] = low_[security]
+							
+							ref_price[security,id[security]] = ref_price_
+							ref_spread[security,id[security]] = ref_spread_
+							ref_volume[security,id[security]] = volume(time-REF_TIME)
+							ref_tcount[security,id[security]] = tcount(time-REF_TIME)
+							
+							bid_[security,id[security]] = bid
+							ask_[security,id[security]] = ask
+							bidvol[security,id[security]] = bidvol_[security]
+							askvol[security,id[security]] = askvol_[security]
+							
+							last_bid[security] = bid
+							last_ask[security] = ask
+							
+						end if
+						
+					end if
+					
+					
+					// Get post-event data
+					// ----------------------------------------------------------------------------------------------------------------
+		
+					if defined id[security] then
+				
+						for declare let i = 1 ; i <= id[security] ; i += 1 do
+						
+							if undefined bidvol_future_1[security,i] and time >= time_[security,i] + HOLD_TIME_1 then
+								bidvol_future_1[security,i] = quotevolbid
+								askvol_future_1[security,i] = quotevolask
+							end if
+						
+							if undefined bidvol_future_2[security,i] and time >= time_[security,i] + HOLD_TIME_2 then
+								bidvol_future_2[security,i] = quotevolbid
+								askvol_future_2[security,i] = quotevolask
+							end if
+							
+							if undefined bidvol_future_3[security,i] and time >= time_[security,i] + HOLD_TIME_3 then
+								bidvol_future_3[security,i] = quotevolbid
+								askvol_future_3[security,i] = quotevolask
+							end if
+						
+						end for
+					
+					end if
+		
+				end if
+			
+			end if
+		
+		end if
+		
+	end if
+	
+end after
+
+// At dayend
+at dayend
+	
+	if istrading(date) then
+	
+		per security
+
+			if not(erroneous_data[security]) and defined bid(time_[security,1]) and defined ask(time_[security,1]) then // bid(time) is undefined in approximately 5% of stocks
+		
+				for declare let i = 1 ; i <= id[security] ; i += 1 do
+					
+					if defined bid_[security,i] and defined ask_[security,i] then
+
+						printcsv filename, 	
+							date, 
+							security, 
+							1, 
+							MKT,
+							i,					
+							time_[security,i], 
+							number(high[security,i]), 
+							number(low[security,i]),  
+							number(ref_price[security,i]),
+							ref_spread[security,i],
+							ref_volume[security,i],
+							ref_tcount[security,i],
+							number(bid_[security,i]),
+							number(ask_[security,i]),
+							number(bid(time_[security,i] + COM_TIME)),
+							number(ask(time_[security,i] + COM_TIME)),
+							bidvol[security,i],
+							askvol[security,i],
+							number(bid(time_[security,i] + HOLD_TIME_1)),
+							number(ask(time_[security,i] + HOLD_TIME_1)),
+							number(bid(time_[security,i] + HOLD_TIME_2)),
+							number(ask(time_[security,i] + HOLD_TIME_2)),
+							number(bid(time_[security,i] + HOLD_TIME_3)),
+							number(ask(time_[security,i] + HOLD_TIME_3)), 
+							bidvol_future_1[security,i], 
+							askvol_future_1[security,i], 
+							bidvol_future_2[security,i], 
+							askvol_future_2[security,i], 
+							bidvol_future_3[security,i], 
+							askvol_future_3[security,i]
+						
+					end if
+						
+				end for
+		
+			end if
+		
+		end per
+		
+		// Clear
+		free bidvol_[]
+		free askvol_[]
+		free high_[]
+		free low_[]
+		free spread_dist[]
+		free spread_count[]
+		free id[]
+		
+		free time_[]
+		free high[]
+		free low[]
+		free bid_[]
+		free ask_[]
+		free bidvol[]
+		free askvol[]
+		
+		free last_bid[]
+		free last_ask[]
+		
+		free ref_price[]
+		free ref_spread[]
+		free ref_volume[]
+		free ref_tcount[]
+
+		free bidvol_future_1[]
+		free askvol_future_1[]
+		free bidvol_future_2[]
+		free askvol_future_2[]
+		free bidvol_future_3[]
+		free askvol_future_3[]
+		
+		free erroneous_data[] 
+		
+	end if
+	
+end at
+
+
+

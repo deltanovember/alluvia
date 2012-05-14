@@ -1,0 +1,27 @@
+
+
+at start
+	
+	declare trade_time[security] : time
+	declare quote_time[security] : time
+	
+end at
+
+on trade
+	trade_time[security] = time
+end on
+
+on quote
+	quote_time[security] = time
+	
+	if quote_time[security] = trade_time[security] and security = ^VOD.L then
+		print "[date] [time] [security] [trade_time[security]] [quote_time[security]]"
+	end if
+
+end on
+
+
+
+
+
+

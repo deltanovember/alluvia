@@ -1,0 +1,263 @@
+/**************************************************************************************************************************************************************************************************************
+
+Config File
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	config
+ 
+Type:		Config
+
+Description:	Contains reference data and function library for Alice scripts
+
+Input(s):	None
+
+Output(s): 	None
+		
+Authors: 	Matthew Clifton, Don Nguyen
+
+Date:  	6 October 2011
+
+Version: 	1.5
+
+History: 	...
+		06/10/2011 v1.4 : Rearranged buy/sell/bid/ask tags, added getASXOpenTime()
+		01/11/2011 v1.5 : Changed market short name arrays, added SGX information
+
+*************************************************************************************************************************************************************************************************************/
+
+
+// =======================================================================================================================================
+// 	REFERENCE DATA
+// =======================================================================================================================================
+
+at start
+
+	declare mkt[string] : string
+	declare scale_price[string] : number
+	declare scale_value[string] : number
+	declare index_name[string,number] : string
+	declare open_auction_start[string] : time
+	declare open_auction_end[string] : time
+	declare open_auction_end_group[string,number] : time
+	declare continuous_end[string] : time
+	declare close_auction_end[string] : time
+	declare random_time[string] : time
+	declare exit_time[string] : time
+	declare let n_indices = 3
+	
+	// Market short names
+	mkt["asx_mq"] = "ASX"
+	mkt["asx_iress"] = "ASX"
+	mkt["asx_daily_mq"] = "ASX"
+	mkt["ASX Equities Combined"] = "ASX"
+	mkt["lse_mq"] = "LSE"
+	mkt["lse_daily_mq"] = "LSE"
+	mkt["nyse_mq"] = "NYSE"
+	mkt["sgx_mq"] = "SGX"
+	
+	print "\nMarket: [marketcode] - [mkt[marketcode]]\n\n"
+	
+	// ASX open auction groups
+	declare letter2group[string] : number
+	letter2group["A"] = 1
+	letter2group["B"] = 1
+	letter2group["C"] = 2
+	letter2group["D"] = 2
+	letter2group["E"] = 2
+	letter2group["F"] = 2
+	letter2group["G"] = 3
+	letter2group["H"] = 3
+	letter2group["I"] = 3
+	letter2group["J"] = 3
+	letter2group["K"] = 3
+	letter2group["L"] = 3
+	letter2group["M"] = 3
+	letter2group["N"] = 4
+	letter2group["O"] = 4
+	letter2group["P"] = 4
+	letter2group["Q"] = 4
+	letter2group["R"] = 4
+	letter2group["S"] = 5
+	letter2group["T"] = 5
+	letter2group["U"] = 5
+	letter2group["V"] = 5
+	letter2group["W"] = 5
+	letter2group["X"] = 5
+	letter2group["Y"] = 5
+	letter2group["Z"] = 5
+	
+
+	// LSE (London Stock Exchange
+	// ----------------------------------------------------------------------------------------------------
+	
+	// Scale price and value ($)
+	scale_price["LSE"] = 1
+	scale_value["LSE"] = 100
+	
+	// The names of any market indices
+	index_name["LSE",1] = "FTSE"
+	index_name["LSE",2] = "FTLC"
+	index_name["LSE",3] = "FTMC"
+	
+	// Market times
+	open_auction_start["LSE"] = 07:50:00
+	open_auction_end["LSE"] = 08:00:00
+	continuous_end["LSE"] = 16:30:00
+	close_auction_end["LSE"] = 16:35:00
+	random_time["LSE"] = 30 seconds
+	exit_time["LSE"] = 09:00:00	
+	
+	// ASX
+	// ----------------------------------------------------------------------------------------------------
+
+	// Scale price and value ($)
+	scale_price["ASX"] = 0.01
+	scale_value["ASX"] = 1
+	
+	// The names of any market indices
+	index_name["ASX",1] = "AORD"
+	
+	// Market times
+	open_auction_start["ASX"] = 09:50:00
+	open_auction_end_group["ASX",1] = 10:00:00
+	open_auction_end_group["ASX",2] = 10:02:15
+	open_auction_end_group["ASX",3] = 10:04:30
+	open_auction_end_group["ASX",4] = 10:06:45
+	open_auction_end_group["ASX",5] = 10:09:00
+	open_auction_end["ASX"] = 10:10:00
+	continuous_end["ASX"] = 16:00:00
+	close_auction_end["ASX"] = 16:09:30 // Approx.
+	random_time["ASX"] = 15 seconds
+	exit_time["ASX"] = 11:00:00
+	
+	
+	// NYSE
+	// ----------------------------------------------------------------------------------------------------
+
+	// Scale price and value ($)
+	scale_price["NYSE"] = 0.01
+	scale_value["NYSE"] = 1
+	
+	// The names of any market indices
+	index_name["NYSE",1] = "NUS"
+	index_name["NYSE",2] = "NYS"
+	
+	// Market times
+	open_auction_start["NYSE"] = 09:00:00 	// ?
+	open_auction_end["NYSE"] = 09:30:00
+	continuous_end["NYSE"] = 16:00:00
+	close_auction_end["NYSE"] = 16:05:00 	// ?
+	random_time["NYSE"] = 30 seconds 		// ?
+	exit_time["NYSE"] = 11:00:00
+	
+	
+	// SGX
+	// ----------------------------------------------------------------------------------------------------
+	
+	// Scale price and value ($)
+	scale_price["SGX"] = 0.01
+	scale_value["SGX"] = 1
+	
+	// The names of any market indices
+	index_name["SGX",1] = "FTSI"
+	
+	// Market times
+	open_auction_start["SGX"] = 08:30:00
+	open_auction_end["SGX"] = 09:00:00
+	continuous_end["SGX"] = 17:00:00
+	close_auction_end["SGX"] = 17:05:00
+	random_time["SGX"] = 60 seconds
+	exit_time["SGX"] = 09:00:00
+
+end at
+
+
+// =======================================================================================================================================
+// 	DEFINED VARIABLES
+// =======================================================================================================================================
+
+// Shortcuts
+#define CONTINUOUS_TRADING ( time > open_auction_end[marketcode] and time < continuous_end[marketcode])
+#define tomorrow trday(date,1)
+#define yesterday trday(date,-1)
+#define yesterday2 trday(date,-2)
+
+// Trade tag fields	
+#define FLAG_BUY_SIDE "B"
+#define FLAG_SELL_SIDE "S"
+#define FLAG_UNCROSSING_TRADE "UT"
+
+// Quote tag fields
+#define FLAG_BID_SIDE "B"
+#define FLAG_ASK_SIDE "A"
+
+
+// =======================================================================================================================================
+// 	FUNCTIONS
+// =======================================================================================================================================
+
+// Date string
+function dateStr(date_ : date) : string
+	
+	declare let d = day(date_)
+	if d < 10 then declare let dd = "0[d]" else declare let dd = "[d]" end if
+	
+	declare let m = month(date_)
+	if m < 10 then declare let mm = "0[m]" else declare let mm = "[m]" end if
+	
+	declare let yyyy = year(date_)
+	
+	return "[yyyy]-[mm]-[dd]"
+	
+end dateStr
+
+// File date string
+function dateStrFile() : string
+	
+	declare let m = month(date)
+	if m < 10 then declare let mm = "0[m]" else declare let mm = "[m]" end if
+	
+	declare let yyyy = year(date)
+	
+	return "[yyyy][mm]"
+	
+end dateStrFile
+
+// Remove double dots in security names
+function formatSecurity() : string
+	
+	declare let sec_ = "[security]"
+	declare let sec_length = strlen(sec_)
+	sec_ = substr(sec_,1,sec_length)
+
+	if substr(sec_,3,3)=="." then
+		sec_ = "[substr(sec_,1,2)].[substr(sec_,3,sec_length)]"
+	end if
+		
+	return sec_
+	
+end formatSecurity
+
+// Determine buy or sell side
+function getSide() : string
+	
+	if price <= bid then
+		return FLAG_SELL_SIDE
+	end if
+	return FLAG_BUY_SIDE
+	
+end getSide
+
+// Determine ASX open time based on security
+function getASXOpenTime() : time
+	
+	declare let sec_ = "[security]"
+	declare let first_letter = substr(sec_,1,1)
+	declare let group = letter2group[first_letter]
+	declare let open_time = open_auction_end_group["ASX",group]
+	//print "[sec_] [first_letter] [group] [open_time]"
+	return open_time
+	
+end getASXOpenTime
+
+

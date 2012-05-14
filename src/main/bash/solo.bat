@@ -1,0 +1,1 @@
+scala com.alluvia.strategies.solo.RunSolo

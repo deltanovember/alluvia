@@ -1,0 +1,94 @@
+/**************************************************************************************************************************************************************************************************************
+
+Full Extractor
+-----------------------------------------------------------------------------------------------------------
+
+Program: 	insider_strategy
+ 
+Type:		Data extraction
+
+Description:	Extracts possible insider trading cases
+
+Input(s):	config.alice
+
+Output(s): 	csv file
+		
+Authors: 	Matthew Clifton
+
+Date:  	29 August2011
+
+Version: 	1.0
+
+Notes: 	- 
+
+*************************************************************************************************************************************************************************************************************/
+
+#include "config.alice"
+
+// =======================================================================================================================================
+// 	USER PARAMS
+// =======================================================================================================================================
+
+userparams
+
+	PRICE_THRESHOLD : "The closing volume threshold" : 3%;
+	VOLUME_THRESHOLD : "The closing volume threshold" : 50%;
+	MIN_VALUE : "Minimum close value" : $1000000;
+	MAX_VOLUME : "Filter out bad data" : x100000000;
+
+end userparams
+
+at start
+	declare intraday_price[security] : distribution
+	declare close_volume[security] : volume
+	declare close_value[security] : value
+end at
+
+on mkttrade
+
+	if time < continuous_end[marketcode] then
+		intraday_price[security] <- price
+	else
+		close_volume[security] += volume
+		close_value[security] += value
+	end if
+
+end on
+
+at dayend
+	
+	per security
+		
+		declare let intraday_maxprice = distmax(intraday_price[security])
+		declare let intraday_minprice = distmin(intraday_price[security])
+		declare let intraday_volume = volume(date,date) - close_volume[security]
+		declare let intraday_value = value(date,date) - close_value[security]
+	
+		if close_value[security] > MIN_VALUE and 
+			close_volume[security] > VOLUME_THRESHOLD * intraday_volume then
+	
+			declare let position = dummystring
+			if number(closeprice(date)) > (100% + PRICE_THRESHOLD) * intraday_maxprice then
+				declare let position = "LONG"
+				declare let pchange = 100 * (vwap(tomorrow) - closeprice(date)) / closeprice(date)
+			elsif number(closeprice(date)) < (100% - PRICE_THRESHOLD) * intraday_minprice then
+				declare let position = "SHORT"
+				declare let pchange = 100 * (closeprice(date) - vwap(tomorrow)) / vwap(tomorrow)
+			end if
+			
+			if defined position then
+				print "[date] [security] [position] [close_value[security]] [intraday_value] [intraday_maxprice] [intraday_minprice] [closeprice(date)] [vwap(tomorrow)] [pchange]"
+			end if
+			
+		end if
+		
+	end per
+	
+	free intraday_price[]
+	free close_volume[]
+	free close_value[]
+	
+end at
+
+
+

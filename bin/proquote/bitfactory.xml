@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<BitFactory.Logging name="global" application="RtdStockClient" isAsynchronous="true" xmlns="http://BitFactory.Logging">
+  <rollingDateFileLoggers>
+    <rollingDateFileLogger
+      formattedFileName="logs\\ClientLog-{timestamp:yyyy-MM-dd}.txt"
+      name="file" 
+      formatString="{application} - {severity} - {timestamp:yyyy-MM-dd HH:mm:ss.fff} - {message}"/>
+  </rollingDateFileLoggers>
+</BitFactory.Logging>
